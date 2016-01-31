@@ -1,0 +1,18 @@
+diff a/services/sensorservice/SensorService.cpp b/services/sensorservice/SensorService.cpp	(rejected hunks)
+@@ -190,7 +195,7 @@ void SensorService::onFirstRef()
+             mSensorEventBuffer = new sensors_event_t[minBufferSize];
+             mSensorEventScratch = new sensors_event_t[minBufferSize];
+             mMapFlushEventsToConnections = new SensorEventConnection const * [minBufferSize];
+-
++			ALOGD("nuSensorService finishing create...");
+             mInitCheck = NO_ERROR;
+             run("SensorService", PRIORITY_URGENT_DISPLAY);
+         }
+@@ -389,6 +404,7 @@ bool SensorService::threadLoop()
+     SensorEventAckReceiver sender(this);
+     sender.run("SensorEventAckReceiver", PRIORITY_URGENT_DISPLAY);
+     const int halVersion = device.getHalDeviceVersion();
++    ALOGD("nuSensorService thread info: mSensorEventBuffer(0x%x), numEventMax(%d), minBufferSize(%d)",mSensorEventBuffer,numEventMax,minBufferSize);
+     do {
+         ssize_t count = device.poll(mSensorEventBuffer, numEventMax);
+         if (count < 0) {

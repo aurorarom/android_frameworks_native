@@ -1,0 +1,97 @@
+diff a/services/surfaceflinger/SurfaceFlinger.h b/services/surfaceflinger/SurfaceFlinger.h	(rejected hunks)
+@@ -139,6 +149,11 @@ private:
+     friend class DisplayEventConnection;
+     friend class Layer;
+     friend class MonitoredProducer;
++#ifdef MTK_AOSP_ENHANCEMENT
++#ifndef MTK_EMULATOR_SUPPORT
++    friend class Resync;
++#endif
++#endif
+ 
+     // This value is specified in number of frames.  Log frame stats at most
+     // every half hour.
+@@ -488,6 +503,83 @@ private:
+ 
+     mat4 mColorMatrix;
+     bool mHasColorMatrix;
++#ifdef MTK_AOSP_ENHANCEMENT
++private:
++    // boot time info
++    bool mBootAnimationEnabled;
++
++    // used to check if display has changed
++    bool mMustRecompose;
++
++    // used to avoid race condition between handleMessageRefresh() and dumpAllLocked()
++    mutable Mutex mDumpLock;
++
++    // for debug
++    void setMTKProperties();
++    void setMTKProperties(String8 &result);
++
++    // decide to run boot animation
++    void checkEnableBootAnim();
++
++    // set boot done msg
++    void bootProf(int start) const;
++
++    virtual status_t getDisplayInfoEx(const sp<IBinder>& display, DisplayInfoEx* info);
++
++public:
++    // helper class for collect related property settings
++    struct PropertiesState {
++        PropertiesState()
++            : mHwRotation(0)
++            , mLogRepaint(false)
++            , mLogTransaction(false)
++            , mLineG3D(false)
++            , mDumpScreenShot(0)
++            , mDelayTime(0)
++            , mDebugSkipComp(false)
++            , mAppVSyncOffset(0)
++            , mSfVSyncOffset(0)
++        { }
++
++        // for phyical panel rotation info
++        int mHwRotation;
++
++        // sf repaint log info
++        bool mLogRepaint;
++
++        // log layer state transaction
++        bool mLogTransaction;
++
++        // debug G3D render
++        bool mLineG3D;
++
++        // debug screen shot result, enabled if value > 0, and increases after each dump
++        uint32_t mDumpScreenShot;
++
++        // for enabling slow motion
++        uint32_t mDelayTime;
++
++        // debug composition enhancement
++        bool mDebugSkipComp;
++
++        // for VSyncOffset
++        int64_t mAppVSyncOffset;
++        int64_t mSfVSyncOffset;
++    };
++    static PropertiesState sPropertiesState;
++
++    // for SF watch dog identity
++    uint32_t mWatchDogIndex;
++
++    // verify which display could be mirrored
++    void scanMirrorDisplay();
++
++    bool getBootFinished() { return mBootFinished; }
++
++    // used to check if display has changed
++    // dpy is the hwc display ID defined in hwcomposer_defs.h
++    bool mustRecompose(size_t dpy) const;
++#endif
+ };
+ 
+ }; // namespace android

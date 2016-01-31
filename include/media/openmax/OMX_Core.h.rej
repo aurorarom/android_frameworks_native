@@ -1,0 +1,18 @@
+diff a/include/media/openmax/OMX_Core.h b/include/media/openmax/OMX_Core.h	(rejected hunks)
+@@ -492,6 +503,16 @@ typedef struct OMX_PORT_PARAM_TYPE {
+     OMX_U32 nStartPortNumber;   /** first port number for this type of port */
+ } OMX_PORT_PARAM_TYPE; 
+ 
++//#ifndef ANDROID_DEFAULT_CODE
++#ifdef MTK_AOSP_ENHANCEMENT
++/** @ingroup comp */
++typedef struct OMX_MTK_PLATFORM_PRIVATE {
++    OMX_U32 mM4UMVABufferPa;
++    OMX_U32 mM4UVABufferVa;
++    //add next private members
++} OMX_MTK_PLATFORM_PRIVATE;
++#endif //ANDROID_DEFAULT_CODE
++
+ /** @ingroup comp */
+ typedef enum OMX_EVENTTYPE
+ {

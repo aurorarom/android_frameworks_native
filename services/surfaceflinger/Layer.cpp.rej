@@ -1,0 +1,26 @@
+diff a/services/surfaceflinger/Layer.cpp b/services/surfaceflinger/Layer.cpp	(rejected hunks)
+@@ -47,6 +52,10 @@
+ 
+ #include "RenderEngine/RenderEngine.h"
+ 
++#ifdef MTK_AOSP_ENHANCEMENT
++#include <cutils/xlog.h>
++#endif
++
+ #define DEBUG_RESIZE    0
+ 
+ namespace android {
+@@ -535,7 +563,13 @@ void Layer::draw(const sp<const DisplayDevice>& hw) const {
+ void Layer::onDraw(const sp<const DisplayDevice>& hw, const Region& clip,
+         bool useIdentityTransform) const
+ {
++#ifdef MTK_AOSP_ENHANCEMENT
++    String8 name("onDraw");
++    name.appendFormat("(%s)", mName.string());
++    ATRACE_NAME(name.string());
++#else
+     ATRACE_CALL();
++#endif
+ 
+     if (CC_UNLIKELY(mActiveBuffer == 0)) {
+         // the texture has not been created yet, this Layer has

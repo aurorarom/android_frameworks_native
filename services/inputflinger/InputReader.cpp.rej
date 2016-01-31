@@ -1,0 +1,15 @@
+diff a/services/inputflinger/InputReader.cpp b/services/inputflinger/InputReader.cpp	(rejected hunks)
+@@ -58,7 +66,13 @@
+ #define INDENT4 "        "
+ #define INDENT5 "          "
+ 
++/// M: Switch log by command @{
++#define ALOGD_READER(...) if (gInputLogReader) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
++/// @}
+ namespace android {
++/// M: Switch log by command @{
++static bool gInputLogReader = false;//false;
++/// @}
+ 
+ // --- Constants ---
+ 

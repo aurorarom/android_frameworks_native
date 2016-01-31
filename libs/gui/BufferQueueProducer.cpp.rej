@@ -1,0 +1,59 @@
+diff a/libs/gui/BufferQueueProducer.cpp b/libs/gui/BufferQueueProducer.cpp	(rejected hunks)
+@@ -631,7 +690,25 @@ status_t BufferQueueProducer::queueBuffer(int slot,
+                     // Reset the frame number of the freed buffer so that it is
+                     // the first in line to be dequeued again
+                     mSlots[front->mSlot].mFrameNumber = 0;
++#ifdef MTK_AOSP_ENHANCEMENT
++                    BQ_LOGI("queueBuffer: slot %d is dropped, handle=%p",
++                            front->mSlot, mSlots[front->mSlot].mGraphicBuffer->handle);
++
++                    char ___traceBuf[256];
++                    snprintf(___traceBuf, 256, "dropped:%d (h:%p)",
++                            front->mSlot, mSlots[front->mSlot].mGraphicBuffer->handle);
++                    android::ScopedTrace ___bufTracer(ATRACE_TAG, ___traceBuf);
++#endif
++                }
++#ifdef MTK_AOSP_ENHANCEMENT
++                else {
++                    BQ_LOGI("queueBuffer: slot %d is dropped", front->mSlot);
++
++                    char ___traceBuf[256];
++                    snprintf(___traceBuf, 256, "dropped:%d", front->mSlot);
++                    android::ScopedTrace ___bufTracer(ATRACE_TAG, ___traceBuf);
+                 }
++#endif
+                 // Overwrite the droppable buffer with the incoming one
+                 *front = item;
+             } else {
+@@ -646,20 +723,31 @@ status_t BufferQueueProducer::queueBuffer(int slot,
+         output->inflate(mCore->mDefaultWidth, mCore->mDefaultHeight,
+                 mCore->mTransformHint, mCore->mQueue.size());
+ 
++#ifdef MTK_AOSP_ENHANCEMENT
++        ATRACE_INT_PERF(mCore->mConsumerName.string(), mCore->mQueue.size());
++#else
+         ATRACE_INT(mCore->mConsumerName.string(), mCore->mQueue.size());
++#endif
+     } // Autolock scope
+ 
+     // Call back without lock held
+     if (listener != NULL) {
+         listener->onFrameAvailable();
+     }
++#ifdef MTK_AOSP_ENHANCEMENT
++    mCore->debugger.onQueue(slot, timestamp);
++#endif
+ 
+     return NO_ERROR;
+ }
+ 
+ void BufferQueueProducer::cancelBuffer(int slot, const sp<Fence>& fence) {
+     ATRACE_CALL();
++#ifdef MTK_AOSP_ENHANCEMENT
++    BQ_LOGD("cancelBuffer: slot %d", slot);
++#else
+     BQ_LOGV("cancelBuffer: slot %d", slot);
++#endif
+     Mutex::Autolock lock(mCore->mMutex);
+ 
+     if (mCore->mIsAbandoned) {

@@ -1,0 +1,37 @@
+diff a/libs/gui/Android.mk b/libs/gui/Android.mk	(rejected hunks)
+@@ -46,6 +46,35 @@ LOCAL_SHARED_LIBRARIES := \
+ 	libutils \
+ 	liblog
+ 
++# --- MediaTek -------------------------------------------------------------------------------------
++MTK_PATH = mediatek
++
++ifneq (, $(findstring MTK_AOSP_ENHANCEMENT, $(COMMON_GLOBAL_CPPFLAGS)))
++	LOCAL_SRC_FILES += \
++		$(MTK_PATH)/BufferQueueDump.cpp \
++		$(MTK_PATH)/BufferQueueDebug.cpp \
++		$(MTK_PATH)/BufferQueueMonitor.cpp
++endif
++
++LOCAL_C_INCLUDES += \
++	hardware/libhardware/include \
++	$(TOP)/$(MTK_ROOT)/hardware/gralloc_extra/include \
++	$(TOP)/$(MTK_ROOT)/hardware/include \
++	$(TOP)/$(MTK_ROOT)/hardware/ui_ext/inc
++
++LOCAL_CFLAGS := -DLOG_TAG=\"GLConsumer\"
++
++LOCAL_SHARED_LIBRARIES += \
++	libdl \
++	libhardware \
++	libui_ext \
++	libgralloc_extra \
++	libselinux
++
++ifeq ($(MTK_EMULATOR_SUPPORT), yes)
++	LOCAL_CFLAGS += -DMTK_EMULATOR_SUPPORT
++endif # MTK_EMULATOR_SUPPORT
++# --------------------------------------------------------------------------------------------------
+ 
+ LOCAL_MODULE:= libgui
+ 

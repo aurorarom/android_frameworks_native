@@ -1,0 +1,39 @@
+diff a/services/surfaceflinger/DisplayHardware/VirtualDisplaySurface.cpp b/services/surfaceflinger/DisplayHardware/VirtualDisplaySurface.cpp	(rejected hunks)
+@@ -14,10 +19,26 @@
+  * limitations under the License.
+  */
+ 
++#ifdef MTK_AOSP_ENHANCEMENT
++#define ATRACE_TAG ATRACE_TAG_GRAPHICS
++#endif
++
+ // #define LOG_NDEBUG 0
+ #include "VirtualDisplaySurface.h"
+ #include "HWComposer.h"
+ 
++#ifdef MTK_AOSP_ENHANCEMENT
++#include <utils/Trace.h>
++#include "gralloc_mtk_defs.h"
++
++#define ATRACE_BUFFER_INDEX(name, index)                                        \
++    if (ATRACE_ENABLED()) {                                                     \
++        char ___traceBuf[256];                                                  \
++        snprintf(___traceBuf, sizeof(___traceBuf), "%s: %d", (name), (index));  \
++        android::ScopedTrace ___bufTracer(ATRACE_TAG, ___traceBuf);             \
++    }
++#endif
++
+ // ---------------------------------------------------------------------------
+ namespace android {
+ // ---------------------------------------------------------------------------
+@@ -165,6 +200,10 @@ status_t VirtualDisplaySurface::advanceFrame() {
+     if (mDisplayId < 0)
+         return NO_ERROR;
+ 
++#ifdef MTK_AOSP_ENHANCEMENT
++    ATRACE_CALL();
++#endif
++
+     if (mCompositionType == COMPOSITION_HWC) {
+         VDS_LOGW_IF(mDbgState != DBG_STATE_PREPARED,
+                 "Unexpected advanceFrame() in %s state on HWC frame",

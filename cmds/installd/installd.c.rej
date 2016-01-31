@@ -1,0 +1,148 @@
+diff a/cmds/installd/installd.c b/cmds/installd/installd.c	(rejected hunks)
+@@ -33,52 +38,62 @@ static int do_ping(char **arg, char reply[REPLY_MAX])
+ 
+ static int do_install(char **arg, char reply[REPLY_MAX])
+ {
++    ALOGD("do_install : %s %s %s %s", arg[0], arg[1], arg[2], arg[3]);
+     return install(arg[0], atoi(arg[1]), atoi(arg[2]), arg[3]); /* pkgname, uid, gid, seinfo */
+ }
+ 
+ static int do_dexopt(char **arg, char reply[REPLY_MAX])
+ {
+     /* apk_path, uid, is_public, pkgname, instruction_set, vm_safe_mode, should_relocate */
++    ALOGD("do_dexopt : %s %s %s %s %s %s", arg[0], arg[1], arg[2], arg[3], arg[4], arg[5]);
+     return dexopt(arg[0], atoi(arg[1]), atoi(arg[2]), arg[3], arg[4], atoi(arg[5]), 0);
+ }
+ 
+ static int do_move_dex(char **arg, char reply[REPLY_MAX])
+ {
++    ALOGD("do_move_dex : %s %s %s", arg[0], arg[1], arg[2]);
+     return move_dex(arg[0], arg[1], arg[2]); /* src, dst, instruction_set */
+ }
+ 
+ static int do_rm_dex(char **arg, char reply[REPLY_MAX])
+ {
++    ALOGD("do_rm_dex : %s %s", arg[0], arg[1]);
+     return rm_dex(arg[0], arg[1]); /* pkgname, instruction_set */
+ }
+ 
+ static int do_remove(char **arg, char reply[REPLY_MAX])
+ {
++    ALOGD("do_remove : %s %s", arg[0], arg[1]);
+     return uninstall(arg[0], atoi(arg[1])); /* pkgname, userid */
+ }
+ 
+ static int do_rename(char **arg, char reply[REPLY_MAX])
+ {
++    ALOGD("do_rename : %s %s", arg[0], arg[1]);
+     return renamepkg(arg[0], arg[1]); /* oldpkgname, newpkgname */
+ }
+ 
+ static int do_fixuid(char **arg, char reply[REPLY_MAX])
+ {
++    ALOGD("do_fixuid : %s %s %s", arg[0], arg[1], arg[2]);
+     return fix_uid(arg[0], atoi(arg[1]), atoi(arg[2])); /* pkgname, uid, gid */
+ }
+ 
+ static int do_free_cache(char **arg, char reply[REPLY_MAX]) /* TODO int:free_size */
+ {
++    ALOGD("do_free_cache : %s", arg[0]);
+     return free_cache((int64_t)atoll(arg[0])); /* free_size */
+ }
+ 
+ static int do_rm_cache(char **arg, char reply[REPLY_MAX])
+ {
++    ALOGD("do_rm_cache : %s %s", arg[0], arg[1]);
+     return delete_cache(arg[0], atoi(arg[1])); /* pkgname, userid */
+ }
+ 
+ static int do_rm_code_cache(char **arg, char reply[REPLY_MAX])
+ {
++    ALOGD("do_rm_code_cache : %s %s", arg[0], arg[1]);
+     return delete_code_cache(arg[0], atoi(arg[1])); /* pkgname, userid */
+ }
+ 
+@@ -105,48 +121,71 @@ static int do_get_size(char **arg, char reply[REPLY_MAX])
+ 
+ static int do_rm_user_data(char **arg, char reply[REPLY_MAX])
+ {
++    ALOGD("do_rm_user_data : %s %s", arg[0], arg[1]);
+     return delete_user_data(arg[0], atoi(arg[1])); /* pkgname, userid */
+ }
+ 
+ static int do_mk_user_data(char **arg, char reply[REPLY_MAX])
+ {
++    ALOGD("do_mk_user_data : %s %s %s %s", arg[0], arg[1], arg[2], arg[3]);
+     return make_user_data(arg[0], atoi(arg[1]), atoi(arg[2]), arg[3]);
+                              /* pkgname, uid, userid, seinfo */
+ }
+ 
+ static int do_mk_user_config(char **arg, char reply[REPLY_MAX])
+ {
++    ALOGD("do_mk_user_config : %s", arg[0]);
+     return make_user_config(atoi(arg[0])); /* userid */
+ }
+ 
+ static int do_rm_user(char **arg, char reply[REPLY_MAX])
+ {
++    ALOGD("do_rm_user : %s", arg[0]);
+     return delete_user(atoi(arg[0])); /* userid */
+ }
+ 
+ static int do_movefiles(char **arg, char reply[REPLY_MAX])
+ {
++    ALOGD("do_movefiles");
+     return movefiles();
+ }
+ 
+ static int do_linklib(char **arg, char reply[REPLY_MAX])
+ {
++    ALOGD("do_linklib : %s %s %s", arg[0], arg[1], arg[2]);
+     return linklib(arg[0], arg[1], atoi(arg[2]));
+ }
+ 
++#ifdef MTK_OAT_ON_SDCARD_SUPPORT
++static int do_move_oat(char **arg, char reply[REPLY_MAX])
++{
++    ALOGD("do_move_oat : %s %s %s %s", arg[0], arg[1], arg[2], arg[3]);
++    return move_oat(arg[0], arg[1], atoi(arg[2]), atoi(arg[3]));
++}
++#endif
++
++/// M: [PMS Recovery]
++static int do_change_uid_root(char **arg, char reply[REPLY_MAX]) {
++    ALOGD("do_change_uid_root : %s %s", arg[0], arg[1]);
++    return change_uid_root(arg[0], atoi(arg[1]));
++}
++
+ static int do_idmap(char **arg, char reply[REPLY_MAX])
+ {
++    ALOGD("do_idmap : %s %s %s", arg[0], arg[1], arg[2]);
+     return idmap(arg[0], arg[1], atoi(arg[2]));
+ }
+ 
+ static int do_restorecon_data(char **arg, char reply[REPLY_MAX] __attribute__((unused)))
+ {
++    ALOGD("do_restorecon_data : %s %s %s", arg[0], arg[1], arg[2]);
+     return restorecon_data(arg[0], arg[1], atoi(arg[2]));
+                              /* pkgName, seinfo, uid*/
+ }
+ 
+ static int do_patchoat(char **arg, char reply[REPLY_MAX]) {
+     /* apk_path, uid, is_public, pkgname, instruction_set, vm_safe_mode, should_relocate */
++    ALOGD("do_patchoat : %s %s %s %s %s", arg[0], arg[1], arg[2], arg[3], arg[4]);
+     return dexopt(arg[0], atoi(arg[1]), atoi(arg[2]), arg[3], arg[4], 0, 1);
+ }
+ 
+@@ -175,6 +214,11 @@ struct cmdinfo cmds[] = {
+     { "mkuserdata",           4, do_mk_user_data },
+     { "mkuserconfig",         1, do_mk_user_config },
+     { "rmuser",               1, do_rm_user },
++#ifdef MTK_OAT_ON_SDCARD_SUPPORT
++    { "moveoat",              4, do_move_oat },
++#endif
++    /// M: [PMS Recovery] Add command
++    { "changeuidroot",        2, do_change_uid_root },
+     { "idmap",                3, do_idmap },
+     { "restorecondata",       3, do_restorecon_data },
+     { "patchoat",             5, do_patchoat },

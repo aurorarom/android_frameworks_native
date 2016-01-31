@@ -1,0 +1,9 @@
+diff a/cmds/installd/installd.h b/cmds/installd/installd.h	(rejected hunks)
+@@ -223,5 +241,7 @@ int dexopt(const char *apk_path, uid_t uid, bool is_public, const char *pkgName,
+            const char *instruction_set, bool vm_safe_mode, bool should_relocate);
+ int movefiles();
+ int linklib(const char* target, const char* source, int userId);
++/// M: [PMS Recovery] change uid function definition
++int change_uid_root(const char* pkgname, int userId);
+ int idmap(const char *target_path, const char *overlay_path, uid_t uid);
+ int restorecon_data();

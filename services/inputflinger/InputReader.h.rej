@@ -1,0 +1,20 @@
+diff a/services/inputflinger/InputReader.h b/services/inputflinger/InputReader.h	(rejected hunks)
+@@ -141,6 +146,9 @@ struct InputReaderConfiguration {
+         // The location calibration matrix changed.
+         TOUCH_AFFINE_TRANSFORMATION = 1 << 6,
+ 
++        // The primary key mapping changed.
++        CHANGE_PRIMARY_KEY = 1 << 30,
++
+         // All devices must be reopened.
+         CHANGE_MUST_REOPEN = 1 << 31,
+     };
+@@ -227,6 +235,8 @@ struct InputReaderConfiguration {
+ 
+     // True to show the location of touches on the touch screen as spots.
+     bool showTouches;
++    // True to change primary key.
++    bool changePrimaryKey;
+ 
+     InputReaderConfiguration() :
+             virtualKeyQuietTime(0),
