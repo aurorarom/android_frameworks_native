@@ -1,9 +1,4 @@
 /*
-* Copyright (C) 2014 MediaTek Inc.
-* Modification based on code covered by the mentioned copyright
-* and/or permission notice(s).
-*/
-/*
  * Copyright (C) 2010 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -307,15 +302,7 @@ enum {
     AKEYCODE_TV_CONTENTS_MENU = 256,
     AKEYCODE_TV_MEDIA_CONTEXT_MENU = 257,
     AKEYCODE_TV_TIMER_PROGRAMMING = 258,
-    AKEYCODE_HELP            = 259,
-    /// M:[SmartBook]Special key @{
-    AKEYCODE_WIFI_TOGGLE     = 260,
-    AKEYCODE_BT_TOGGLE       = 261,
-    AKEYCODE_LOCK_TOGGLE     = 262,
-    AKEYCODE_IME_TOGGLE      = 263,
-    AKEYCODE_MESSAGING       = 264,
-    AKEYCODE_GALLERY         = 265
-    /// @}
+    AKEYCODE_HELP            = 259
 
     // NOTE: If you add a new keycode here you must also add it to several other files.
     //       Refer to frameworks/base/core/java/android/view/KeyEvent.java for the full list.

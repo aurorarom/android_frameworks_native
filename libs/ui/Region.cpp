@@ -32,9 +32,6 @@
 
 #include <private/ui/RegionHelper.h>
 
-// [MTK] temporarily added for debug
-#include <stdlib.h>
-
 // ----------------------------------------------------------------------------
 #define VALIDATE_REGIONS        (false)
 #define VALIDATE_WITH_CORECG    (false)
@@ -819,13 +816,6 @@ void Region::dump(String8& out, const char* what, uint32_t flags) const
     (void)flags;
     const_iterator head = begin();
     const_iterator const tail = end();
-
-    // [MTK] temporarily added for debug
-    if (tail < head) {
-        ALOGE("Region::dump() is failed since tail(%p) < head(%p), isRect=%d, array=%p, size=%d",
-            tail, head, isRect(), mStorage.array(), mStorage.size());
-        abort();
-    }
 
     size_t SIZE = 256;
     char buffer[SIZE];

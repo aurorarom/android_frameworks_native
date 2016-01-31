@@ -26,12 +26,6 @@
 
 #include <ui/GraphicBufferAllocator.h>
 
-#ifdef MTK_AOSP_ENHANCEMENT 
-#include <binder/IPCThreadState.h>
-#include <cutils/properties.h>
-#include <utils/CallStack.h>
-#endif
-
 namespace android {
 // ---------------------------------------------------------------------------
 
@@ -50,15 +44,6 @@ GraphicBufferAllocator::GraphicBufferAllocator()
     if (err == 0) {
         gralloc_open(module, &mAllocDev);
     }
-
-#ifdef MTK_AOSP_ENHANCEMENT 
-    char value[PROPERTY_VALUE_MAX];
-    property_get("debug.gbuf.callstack", value, "0");
-    mIsDumpCallStack = atoi(value);
-    if (true == mIsDumpCallStack) {
-        ALOGI("!!! dump GraphicBufferAllocator callstack for pid:%d !!!", getpid());
-    }
-#endif
 }
 
 GraphicBufferAllocator::~GraphicBufferAllocator()
@@ -161,26 +146,11 @@ status_t GraphicBufferAllocator::alloc(uint32_t w, uint32_t h,
         list.add(*handle, rec);
     }
 
-#ifdef MTK_AOSP_ENHANCEMENT 
-    // dump call stack here after handle value got
-    if (true == mIsDumpCallStack) {
-        ALOGD("[GraphicBufferAllocator::alloc] handle:%p", *handle);
-        CallStack stack("    ");
-    }
-#endif
-
     return err;
 }
 
 status_t GraphicBufferAllocator::free(buffer_handle_t handle)
 {
-#ifdef MTK_AOSP_ENHANCEMENT 
-    if (true == mIsDumpCallStack) {
-        ALOGD("[GraphicBufferAllocator::free] handle:%p", handle);
-        CallStack stack("    ");
-    }
-#endif
-
     ATRACE_CALL();
     status_t err;
 

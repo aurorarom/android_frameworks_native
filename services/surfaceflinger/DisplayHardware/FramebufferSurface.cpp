@@ -1,9 +1,4 @@
 /*
-* Copyright (C) 2014 MediaTek Inc.
-* Modification based on code covered by the mentioned copyright
-* and/or permission notice(s).
-*/
-/*
  **
  ** Copyright 2012 The Android Open Source Project
  **
@@ -63,27 +58,11 @@ FramebufferSurface::FramebufferSurface(HWComposer& hwc, int disp,
     mCurrentBuffer(0),
     mHwc(hwc)
 {
-#ifdef MTK_AOSP_ENHANCEMENT
-    // add type info in name for different physical types
-    mName = String8::format("FrameBufferSurface_%d", mDisplayType);
-#else
     mName = "FramebufferSurface";
-#endif
     mConsumer->setConsumerName(mName);
-#ifdef MTK_AOSP_ENHANCEMENT
-    if (mDisplayType == HWC_DISPLAY_EXTERNAL) {
-        mConsumer->setConsumerUsageBits(GRALLOC_USAGE_HW_RENDER |
-                GRALLOC_USAGE_HW_COMPOSER);
-    } else {
-        mConsumer->setConsumerUsageBits(GRALLOC_USAGE_HW_FB |
-                GRALLOC_USAGE_HW_RENDER |
-                GRALLOC_USAGE_HW_COMPOSER);
-    }
-#else
     mConsumer->setConsumerUsageBits(GRALLOC_USAGE_HW_FB |
                                        GRALLOC_USAGE_HW_RENDER |
                                        GRALLOC_USAGE_HW_COMPOSER);
-#endif
     mConsumer->setDefaultBufferFormat(mHwc.getFormat(disp));
     mConsumer->setDefaultBufferSize(mHwc.getWidth(disp),  mHwc.getHeight(disp));
     mConsumer->setDefaultMaxBufferCount(NUM_FRAMEBUFFER_SURFACE_BUFFERS);

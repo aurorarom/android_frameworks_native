@@ -1,9 +1,4 @@
 /*
-* Copyright (C) 2014 MediaTek Inc.
-* Modification based on code covered by the mentioned copyright
-* and/or permission notice(s).
-*/
-/*
  * Copyright (C) 2010 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -273,12 +268,7 @@ int Surface::dequeueBuffer(android_native_buffer_t** buffer, int* fenceFd) {
         }
     }
 
-#ifdef MTK_AOSP_ENHANCEMENT
-    // Google issue: binder transaction might be failed and get null fence
-    if (fence != NULL && fence->isValid()) {
-#else
     if (fence->isValid()) {
-#endif
         *fenceFd = fence->dup();
         if (*fenceFd == -1) {
             ALOGE("dequeueBuffer: error duping fence: %d", errno);
@@ -331,11 +321,7 @@ int Surface::lockBuffer_DEPRECATED(android_native_buffer_t* buffer __attribute__
 }
 
 int Surface::queueBuffer(android_native_buffer_t* buffer, int fenceFd) {
-#ifdef MTK_AOSP_ENHANCEMENT
-    ATRACE_CALL_PERF();
-#else
     ATRACE_CALL();
-#endif
     ALOGV("Surface::queueBuffer");
     Mutex::Autolock lock(mMutex);
     int64_t timestamp;

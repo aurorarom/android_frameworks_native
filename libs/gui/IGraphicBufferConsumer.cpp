@@ -1,9 +1,4 @@
 /*
-* Copyright (C) 2014 MediaTek Inc.
-* Modification based on code covered by the mentioned copyright
-* and/or permission notice(s).
-*/
-/*
  * Copyright (C) 2013 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -416,11 +411,7 @@ public:
         data.writeString8(result);
         data.writeString8(String8(prefix ? prefix : ""));
         remote()->transact(DUMP, data, &reply);
-#ifdef MTK_AOSP_ENHANCEMENT
-        result = reply.readString8();
-#else
         reply.readString8();
-#endif
     }
 };
 

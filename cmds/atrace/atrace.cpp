@@ -1,9 +1,4 @@
 /*
-* Copyright (C) 2014 MediaTek Inc.
-* Modification based on code covered by the mentioned copyright
-* and/or permission notice(s).
-*/
-/*
  * Copyright (C) 2012 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -91,8 +86,6 @@ static const TracingCategory k_categories[] = {
     { "res",        "Resource Loading", ATRACE_TAG_RESOURCES, { } },
     { "dalvik",     "Dalvik VM",        ATRACE_TAG_DALVIK, { } },
     { "rs",         "RenderScript",     ATRACE_TAG_RS, { } },
-    { "hwui",       "HWUI",             ATRACE_TAG_HWUI, { } },
-    { "perf",       "Performance",      ATRACE_TAG_PERF, { } },
     { "bionic",     "Bionic C Library", ATRACE_TAG_BIONIC, { } },
     { "power",      "Power Management", ATRACE_TAG_POWER, { } },
     { "sched",      "CPU Scheduling",   0, {
@@ -197,12 +190,6 @@ static const char* k_tracingOnPath =
 
 static const char* k_tracePath =
     "/sys/kernel/debug/tracing/trace";
-    
-/*
- * M: Enable process name 
- */
-static const char* k_tracingRecordcmdEnablePath =
-    "/sys/kernel/debug/tracing/options/record-cmd";
 
 // Check whether a file exists.
 static bool fileExists(const char* filename) {
@@ -334,14 +321,6 @@ static bool setTraceOverwriteEnable(bool enable)
 static bool setTracingEnabled(bool enable)
 {
     return setKernelOptionEnable(k_tracingOnPath, enable);
-}
-
-/*
- * M: Enable process name logging
- */
-static bool setTraceRecordcmdEnable(bool enable)
-{
-    return setKernelOptionEnable(k_tracingRecordcmdEnablePath, enable);
 }
 
 // Clear the contents of the kernel trace.
@@ -581,17 +560,8 @@ static bool setUpTrace()
     ok &= setTraceOverwriteEnable(g_traceOverwrite);
     ok &= setTraceBufferSizeKB(g_traceBufferSizeKB);
     ok &= setGlobalClockEnable(true);
-    
-    /*
-     * M: Disable by MTK
-     */
-    //ok &= setPrintTgidEnableIfPresent(true);
+    ok &= setPrintTgidEnableIfPresent(true);
     ok &= setKernelTraceFuncs(g_kernelTraceFuncs);
-    
-    /*
-     * M: Enable process name logging
-     */
-    ok &= setTraceRecordcmdEnable(true);
 
     // Set up the tags property.
     uint64_t tags = 0;
@@ -636,11 +606,6 @@ static void cleanUpTrace()
 {
     // Disable all tracing that we're able to.
     disableKernelTraceEvents();
-    
-    /*
-     * M: Enable process name logging
-     */
-    setTraceRecordcmdEnable(false);
 
     // Reset the system properties.
     setTagsProperty(0);
@@ -861,7 +826,6 @@ int main(int argc, char **argv)
             {"async_stop",      no_argument, 0,  0 },
             {"async_dump",      no_argument, 0,  0 },
             {"list_categories", no_argument, 0,  0 },
-            {"poke_services",   no_argument, 0,  0 },
             {           0,                0, 0,  0 }
         };
 
@@ -927,10 +891,7 @@ int main(int argc, char **argv)
                 } else if (!strcmp(long_options[option_index].name, "list_categories")) {
                     listSupportedCategories();
                     exit(0);
-                } else if (!strcmp(long_options[option_index].name, "poke_services")) {
-                    pokeBinderServices();
-                    exit(0);
-                }                
+                }
             break;
 
             default:

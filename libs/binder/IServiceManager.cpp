@@ -1,9 +1,4 @@
 /*
-* Copyright (C) 2014 MediaTek Inc.
-* Modification based on code covered by the mentioned copyright
-* and/or permission notice(s).
-*/
-/*
  * Copyright (C) 2005 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -161,22 +156,11 @@ public:
             bool allowIsolated)
     {
         Parcel data, reply;
-	unsigned n;
-        status_t err;
         data.writeInterfaceToken(IServiceManager::getInterfaceDescriptor());
         data.writeString16(name);
         data.writeStrongBinder(service);
         data.writeInt32(allowIsolated ? 1 : 0);
-        for (n = 1; n <= 5; n++) {
-            err = remote()->transact(ADD_SERVICE_TRANSACTION, data, &reply);
-            if (err == -EPIPE) {
-                ALOGI("%s is waiting for serviceManager... (retry %d)\n",
-                    String8(name).string(), n);
-                sleep(1);
-            } else {
-                break;
-            }
-        }
+        status_t err = remote()->transact(ADD_SERVICE_TRANSACTION, data, &reply);
         return err == NO_ERROR ? reply.readExceptionCode() : err;
     }
 

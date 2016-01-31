@@ -1,9 +1,4 @@
 /*
-* Copyright (C) 2014 MediaTek Inc.
-* Modification based on code covered by the mentioned copyright
-* and/or permission notice(s).
-*/
-/*
  * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -68,11 +63,6 @@ class EventThread : public Thread, private VSyncSource::Callback {
         // count == 0 : one-shot event that has not fired
         // count ==-1 : one-shot event that fired this round / disabled
         int32_t count;
-
-#ifdef MTK_AOSP_ENHANCEMENT
-        // reserve client pid infomation
-        int32_t pid;
-#endif
 
     private:
         virtual ~Connection();

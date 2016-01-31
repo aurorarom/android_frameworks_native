@@ -1,9 +1,4 @@
 /*
-* Copyright (C) 2014 MediaTek Inc.
-* Modification based on code covered by the mentioned copyright
-* and/or permission notice(s).
-*/
-/*
  * Copyright (C) 2010 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -56,9 +51,6 @@
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
-#include <fcntl.h>
-#include <utils/Trace.h>
-#include <cutils/properties.h>
 
 #define INDENT "  "
 #define INDENT2 "    "
@@ -222,48 +214,6 @@ static void synthesizeButtonKeys(InputReaderContext* context, int32_t action,
 }
 
 
-// MT profiling interface
-// arg: start, 1 for start profiling; 0 for stop profiling
-static void mtProf(int start)
-{
-    int fd_profsts,fd_memprof,fd_cputime;
-    int ret;
-    char buf[64];
-
-    /* 1. Check if we need to trigger profiling*/
-    fd_profsts = open("/proc/mtprof/status",O_RDWR);
-    if (fd_profsts == -1){
-        ALOG(LOG_INFO,"AP_PROF","unable to open /proc/mtprof/status entry");
-        return;
-    }
-    read(fd_profsts, buf,1);
-    if(buf[0] == '0'){
-        //LOG(LOG_INFO,"AP_PROF"," mt prof is not set, status = 0");
-	close(fd_profsts);
-	return;
-    }
-
-    /* 2. trigger profiling */
-    fd_cputime = open("/proc/mtprof/cputime",O_RDWR);
-
-    if (fd_cputime == -1){
-        ALOG(LOG_INFO,"AP_PROF","unable to open /proc/mtprof/cputime entry");
-        return;
-    }
-   
-    if(1 == start){
-        ALOG(LOG_INFO,"AP_PROF","Start MT profiling");
-        write(fd_cputime,"1", 1);
-    }
-    else
-    {
-        write(fd_cputime,"0", 1);
-        write(fd_profsts,"0", 1);
-    }
-
-    close(fd_cputime);
-    close(fd_profsts);
-}
 // --- InputReaderConfiguration ---
 
 bool InputReaderConfiguration::getDisplayInfo(bool external, DisplayViewport* outViewport) const {
@@ -305,11 +255,10 @@ InputReader::InputReader(const sp<EventHubInterface>& eventHub,
 
     { // acquire lock
         AutoMutex _l(mLock);
-        ALOGD("InputReader:: InputReader lock " );
+
         refreshConfigurationLocked(0);
         updateGlobalMetaStateLocked();
     } // release lock
-    ALOGD("InputReader:: InputReader unlock " );
 }
 
 InputReader::~InputReader() {
@@ -636,9 +585,7 @@ int32_t InputReader::bumpGenerationLocked() {
 
 void InputReader::getInputDevices(Vector<InputDeviceInfo>& outInputDevices) {
     AutoMutex _l(mLock);
-	ALOGD("getInputDevices:: acquire lock " );
     getInputDevicesLocked(outInputDevices);
-	ALOGD("getInputDevices:: release lock " );
 }
 
 void InputReader::getInputDevicesLocked(Vector<InputDeviceInfo>& outInputDevices) {
@@ -657,20 +604,20 @@ void InputReader::getInputDevicesLocked(Vector<InputDeviceInfo>& outInputDevices
 int32_t InputReader::getKeyCodeState(int32_t deviceId, uint32_t sourceMask,
         int32_t keyCode) {
     AutoMutex _l(mLock);
-    ALOGD("InputReader:: getKeyCodeState lock " );
+
     return getStateLocked(deviceId, sourceMask, keyCode, &InputDevice::getKeyCodeState);
 }
 
 int32_t InputReader::getScanCodeState(int32_t deviceId, uint32_t sourceMask,
         int32_t scanCode) {
     AutoMutex _l(mLock);
-     ALOGD("InputReader:: getScanCodeState lock " );
+
     return getStateLocked(deviceId, sourceMask, scanCode, &InputDevice::getScanCodeState);
 }
 
 int32_t InputReader::getSwitchState(int32_t deviceId, uint32_t sourceMask, int32_t switchCode) {
     AutoMutex _l(mLock);
-    ALOGD("InputReader:: getSwitchState lock " );
+
     return getStateLocked(deviceId, sourceMask, switchCode, &InputDevice::getSwitchState);
 }
 
@@ -701,14 +648,13 @@ int32_t InputReader::getStateLocked(int32_t deviceId, uint32_t sourceMask, int32
             }
         }
     }
-	ALOGD("InputReader::getStateLocked:: return " );
     return result;
 }
 
 bool InputReader::hasKeys(int32_t deviceId, uint32_t sourceMask,
         size_t numCodes, const int32_t* keyCodes, uint8_t* outFlags) {
     AutoMutex _l(mLock);
-    ALOGD("K_lock" );
+
     memset(outFlags, 0, numCodes);
     return markSupportedKeyCodesLocked(deviceId, sourceMask, numCodes, keyCodes, outFlags);
 }
@@ -735,13 +681,12 @@ bool InputReader::markSupportedKeyCodesLocked(int32_t deviceId, uint32_t sourceM
             }
         }
     }
-	ALOGD("SK_Lock_r" );
     return result;
 }
 
 void InputReader::requestRefreshConfiguration(uint32_t changes) {
     AutoMutex _l(mLock);
-    ALOGD("InputReader:: requestRefreshConfiguration lock " );
+
     if (changes) {
         bool needWake = !mConfigurationChangesToRefresh;
         mConfigurationChangesToRefresh |= changes;
@@ -750,46 +695,32 @@ void InputReader::requestRefreshConfiguration(uint32_t changes) {
             mEventHub->wake();
         }
     }
-   ALOGD("InputReader:: requestRefreshConfiguration unlock " );
 }
 
 void InputReader::vibrate(int32_t deviceId, const nsecs_t* pattern, size_t patternSize,
         ssize_t repeat, int32_t token) {
     AutoMutex _l(mLock);
-    ALOGD("InputReader:: vibrate lock " );
+
     ssize_t deviceIndex = mDevices.indexOfKey(deviceId);
     if (deviceIndex >= 0) {
         InputDevice* device = mDevices.valueAt(deviceIndex);
         device->vibrate(pattern, patternSize, repeat, token);
     }
-	ALOGD("InputReader:: vibrate unlock " );
 }
 
 void InputReader::cancelVibrate(int32_t deviceId, int32_t token) {
     AutoMutex _l(mLock);
-    ALOGD("InputReader:: cancelVibrate lock " );
+
     ssize_t deviceIndex = mDevices.indexOfKey(deviceId);
     if (deviceIndex >= 0) {
         InputDevice* device = mDevices.valueAt(deviceIndex);
         device->cancelVibrate(token);
     }
-	ALOGD("InputReader:: cancelVibrate unlock " );
 }
 
 void InputReader::dump(String8& dump) {
     AutoMutex _l(mLock);
-    ALOGD("InputReader:: dump lock " );
-    /// M: Switch log by command @{
-    char buf[PROPERTY_VALUE_MAX];
-    property_get("sys.inputlog.latency", buf, "false");
-    if (!strcmp(buf, "true")) {
-        gInputLogReader = true;
-        ALOGD("Input reader log is enabled");
-    } else if (!strcmp(buf, "false")) {
-        gInputLogReader = false;
-        ALOGD("Input reader log is disabled");
-    }
-    /// @}
+
     mEventHub->dump(dump);
     dump.append("\n");
 
@@ -850,21 +781,17 @@ void InputReader::dump(String8& dump) {
             mConfig.pointerGestureMovementSpeedRatio);
     dump.appendFormat(INDENT3 "ZoomSpeedRatio: %0.1f\n",
             mConfig.pointerGestureZoomSpeedRatio);
-	ALOGD("InputReader:: dump unlock " );
 }
 
 void InputReader::monitor() {
     // Acquire and release the lock to ensure that the reader has not deadlocked.
     mLock.lock();
-	ALOGD("InputReader::monitor: lock" );
     mEventHub->wake();
-	ALOGD("InputReader::monitor: wait " );
     mReaderIsAliveCondition.wait(mLock);
     mLock.unlock();
-    ALOGD("InputReader::monitor: unlock" );
+
     // Check the EventHub
     mEventHub->monitor();
-	ALOGD("InputReader::monitor: done" );
 }
 
 
@@ -1196,23 +1123,11 @@ void InputDevice::notifyReset(nsecs_t when) {
 
 CursorButtonAccumulator::CursorButtonAccumulator() {
     clearButtons();
-    mChangePrimaryKey=false;
 }
 
-void CursorButtonAccumulator::configure(const InputReaderConfiguration * config) {
-    if(config->changePrimaryKey)
-        mChangePrimaryKey=true;
-    else	
-        mChangePrimaryKey=false;
-}
 void CursorButtonAccumulator::reset(InputDevice* device) {
-    if(!mChangePrimaryKey) {
     mBtnLeft = device->isKeyPressed(BTN_LEFT);
     mBtnRight = device->isKeyPressed(BTN_RIGHT);
-    } else {
-        mBtnRight = device->isKeyPressed(BTN_LEFT);
-        mBtnLeft = device->isKeyPressed(BTN_RIGHT);
-    }
     mBtnMiddle = device->isKeyPressed(BTN_MIDDLE);
     mBtnBack = device->isKeyPressed(BTN_BACK);
     mBtnSide = device->isKeyPressed(BTN_SIDE);
@@ -1236,18 +1151,10 @@ void CursorButtonAccumulator::process(const RawEvent* rawEvent) {
     if (rawEvent->type == EV_KEY) {
         switch (rawEvent->code) {
         case BTN_LEFT:
-	    ALOGD_READER("Button Left!");
-	    if(!mChangePrimaryKey)
             mBtnLeft = rawEvent->value;
-	    else
-		mBtnRight = rawEvent->value;
             break;
         case BTN_RIGHT:
-	    ALOGD_READER("Button Right!");
-	    if(!mChangePrimaryKey)
             mBtnRight = rawEvent->value;
-	    else
-		mBtnLeft = rawEvent->value;
             break;
         case BTN_MIDDLE:
             mBtnMiddle = rawEvent->value;
@@ -2310,11 +2217,6 @@ void KeyboardInputMapper::processKey(nsecs_t when, bool down, int32_t keyCode,
             down ? AKEY_EVENT_ACTION_DOWN : AKEY_EVENT_ACTION_UP,
             AKEY_EVENT_FLAG_FROM_SYSTEM, keyCode, scanCode, newMetaState, downTime);
     getListener()->notifyKey(&args);
-	ALOGD_READER("notifyKey - eventTime=%lld, deviceId=%d, source=0x%x, policyFlags=0x%x, action=0x%x, "
-				"flags=0x%x, keyCode=0x%x, scanCode=0x%x, metaState=0x%x, downTime=%lld",
-				args.eventTime, args.deviceId, args.source, args.policyFlags,
-				args.action, args.flags, args.keyCode, args.scanCode,
-				args.metaState, args.downTime);
 }
 
 ssize_t KeyboardInputMapper::findKeyDown(int32_t scanCode) {
@@ -2470,9 +2372,6 @@ void CursorInputMapper::configure(nsecs_t when,
         mPointerVelocityControl.setParameters(config->pointerVelocityControlParameters);
         mWheelXVelocityControl.setParameters(config->wheelVelocityControlParameters);
         mWheelYVelocityControl.setParameters(config->wheelVelocityControlParameters);
-    }
-    if (!changes || (changes & InputReaderConfiguration::CHANGE_PRIMARY_KEY)) {
-        mCursorButtonAccumulator.configure(config);
     }
 
     if (!changes || (changes & InputReaderConfiguration::CHANGE_DISPLAY_INFO)) {
@@ -2903,9 +2802,6 @@ void TouchInputMapper::configure(nsecs_t when,
         mPointerVelocityControl.setParameters(mConfig.pointerVelocityControlParameters);
         mWheelXVelocityControl.setParameters(mConfig.wheelVelocityControlParameters);
         mWheelYVelocityControl.setParameters(mConfig.wheelVelocityControlParameters);
-    }
-    if (!changes || (changes & InputReaderConfiguration::CHANGE_PRIMARY_KEY)) {
-        mCursorButtonAccumulator.configure(config);
     }
 
     bool resetNeeded = false;
@@ -4170,18 +4066,11 @@ void TouchInputMapper::dispatchVirtualKey(nsecs_t when, uint32_t policyFlags,
     int32_t scanCode = mCurrentVirtualKey.scanCode;
     nsecs_t downTime = mCurrentVirtualKey.downTime;
     int32_t metaState = mContext->getGlobalMetaState();
-    nsecs_t now = systemTime(SYSTEM_TIME_MONOTONIC);
     policyFlags |= POLICY_FLAG_VIRTUAL;
 
-    ALOGD_READER("dispatchVirtualKey now(ns): %lld",now);
     NotifyKeyArgs args(when, getDeviceId(), AINPUT_SOURCE_KEYBOARD, policyFlags,
             keyEventAction, keyEventFlags, keyCode, scanCode, metaState, downTime);
     getListener()->notifyKey(&args);
-	ALOGD_READER("notifyKey - eventTime=%lld, deviceId=%d, source=0x%x, policyFlags=0x%x, action=0x%x, "
-				"flags=0x%x, keyCode=0x%x, scanCode=0x%x, metaState=0x%x, downTime=%lld",
-				args.eventTime, args.deviceId, args.source, args.policyFlags,
-				args.action, args.flags, args.keyCode, args.scanCode,
-				args.metaState, args.downTime);
 }
 
 void TouchInputMapper::dispatchTouches(nsecs_t when, uint32_t policyFlags) {
@@ -4189,13 +4078,11 @@ void TouchInputMapper::dispatchTouches(nsecs_t when, uint32_t policyFlags) {
     BitSet32 lastIdBits = mLastCookedPointerData.touchingIdBits;
     int32_t metaState = getContext()->getGlobalMetaState();
     int32_t buttonState = mCurrentButtonState;
-    nsecs_t now = systemTime(SYSTEM_TIME_MONOTONIC);
 
     if (currentIdBits == lastIdBits) {
         if (!currentIdBits.isEmpty()) {
             // No pointer id changes so this is a move event.
             // The listener takes care of batching moves so we don't have to deal with that here.
-            ALOGD_READER("dispatchTouches POINTER MOVE now(ns): %lld",now);
             dispatchMotion(when, policyFlags, mSource,
                     AMOTION_EVENT_ACTION_MOVE, 0, metaState, buttonState,
                     AMOTION_EVENT_EDGE_FLAG_NONE,
@@ -4230,10 +4117,7 @@ void TouchInputMapper::dispatchTouches(nsecs_t when, uint32_t policyFlags) {
         // Dispatch pointer up events.
         while (!upIdBits.isEmpty()) {
             uint32_t upId = upIdBits.clearFirstMarkedBit();
-            {
-            	ScopedTrace _l(ATRACE_TAG_INPUT|ATRACE_TAG_PERF, "AppLaunch_dispatchPtr:Up");
-            	ALOGD("AP_PROF:AppLaunch_dispatchPtr:Up:%lld, ID:%d, Index:%d", when/1000000, upId, mLastCookedPointerData.idToIndex);
-	    		ALOGD_READER("dispatchMotion POINTER UP now(ns): %lld",now);
+
             dispatchMotion(when, policyFlags, mSource,
                     AMOTION_EVENT_ACTION_POINTER_UP, 0, metaState, buttonState, 0,
                     mLastCookedPointerData.pointerProperties,
@@ -4243,14 +4127,12 @@ void TouchInputMapper::dispatchTouches(nsecs_t when, uint32_t policyFlags) {
                     mOrientedXPrecision, mOrientedYPrecision, mDownTime);
             dispatchedIdBits.clearBit(upId);
         }
-        }
 
         // Dispatch move events if any of the remaining pointers moved from their old locations.
         // Although applications receive new locations as part of individual pointer up
         // events, they do not generally handle them except when presented in a move event.
         if (moveNeeded) {
             ALOG_ASSERT(moveIdBits.value == dispatchedIdBits.value);
-            ALOGD_READER("dispatchMotion POINTER MOVE, now(ns): %lld",now);
             dispatchMotion(when, policyFlags, mSource,
                     AMOTION_EVENT_ACTION_MOVE, 0, metaState, buttonState, 0,
                     mCurrentCookedPointerData.pointerProperties,
@@ -4268,14 +4150,8 @@ void TouchInputMapper::dispatchTouches(nsecs_t when, uint32_t policyFlags) {
             if (dispatchedIdBits.count() == 1) {
                 // First pointer is going down.  Set down time.
                 mDownTime = when;
-				{
-					ScopedTrace _l(ATRACE_TAG_INPUT, "AppLaunch_dispatchPtr:Down");
-					ALOGD("AP_PROF:AppLaunch_dispatchPtr:Down:%lld, ID:%d, Index:%d", mDownTime/1000000, downId, mCurrentCookedPointerData.idToIndex);
-					mtProf(1);
-            }
             }
 
-            ALOGD_READER("dispatchMotion POINTER DOWN now(ns): %lld",now);
             dispatchMotion(when, policyFlags, mSource,
                     AMOTION_EVENT_ACTION_POINTER_DOWN, 0, metaState, buttonState, 0,
                     mCurrentCookedPointerData.pointerProperties,
@@ -5882,55 +5758,7 @@ void TouchInputMapper::dispatchMotion(nsecs_t when, uint32_t policyFlags, uint32
             action, flags, metaState, buttonState, edgeFlags,
             mViewport.displayId, pointerCount, pointerProperties, pointerCoords,
             xPrecision, yPrecision, downTime);
-	
-	ALOGD_READER("notifyMotion call dispatcher");
-	
     getListener()->notifyMotion(&args);
-
-    /** M: MET inputreader milestone. @{ */
-    {
-        char* buff = NULL;
-
-        buff = (char*)malloc(4096);
-        if (buff) {
-            sprintf(buff, "MET_notifyMotion: %llx,%d,%x,%x", 
-                args.eventTime,
-                args.action, 
-                (int)args.pointerCoords[0].getAxisValue(AMOTION_EVENT_AXIS_X),
-                (int)args.pointerCoords[0].getAxisValue(AMOTION_EVENT_AXIS_Y));
-            ScopedTrace _l(ATRACE_TAG_INPUT, buff);
-            free(buff);
-        }
-    }
-    /** @} */ 
-
-	/// M: input systrace  @{
-    ALOGD_READER("notifyMotion - eventTime=%lld, deviceId=%d, source=0x%x, policyFlags=0x%x, "
-            "action=0x%x, flags=0x%x, metaState=0x%x, buttonState=0x%x, edgeFlags=0x%x, "
-            "xPrecision=%f, yPrecision=%f, downTime=%lld",
-            args.eventTime, args.deviceId, args.source, args.policyFlags,
-            args.action, args.flags, args.metaState, args.buttonState,
-            args.edgeFlags, args.xPrecision, args.yPrecision, args.downTime);
-	if(gInputLogReader){
-	    for (uint32_t i = 0; i < args.pointerCount; i++) {
-	        ALOGD_READER("notifyMotion - Pointer %d: id=%d, toolType=%d, "
-	                "x=%f, y=%f, pressure=%f, size=%f, "
-	                "touchMajor=%f, touchMinor=%f, toolMajor=%f, toolMinor=%f, "
-	                "orientation=%f",
-	                i, args.pointerProperties[i].id,
-	                args.pointerProperties[i].toolType,
-	                args.pointerCoords[i].getAxisValue(AMOTION_EVENT_AXIS_X),
-	                args.pointerCoords[i].getAxisValue(AMOTION_EVENT_AXIS_Y),
-	                args.pointerCoords[i].getAxisValue(AMOTION_EVENT_AXIS_PRESSURE),
-	                args.pointerCoords[i].getAxisValue(AMOTION_EVENT_AXIS_SIZE),
-	                args.pointerCoords[i].getAxisValue(AMOTION_EVENT_AXIS_TOUCH_MAJOR),
-	                args.pointerCoords[i].getAxisValue(AMOTION_EVENT_AXIS_TOUCH_MINOR),
-	                args.pointerCoords[i].getAxisValue(AMOTION_EVENT_AXIS_TOOL_MAJOR),
-	                args.pointerCoords[i].getAxisValue(AMOTION_EVENT_AXIS_TOOL_MINOR),
-	                args.pointerCoords[i].getAxisValue(AMOTION_EVENT_AXIS_ORIENTATION));
-	    }
-	}
-    /// @}	
 }
 
 bool TouchInputMapper::updateMovedPointers(const PointerProperties* inProperties,

@@ -33,11 +33,6 @@
 
 #include "DispSync.h"
 #include "EventLog/EventLog.h"
-#ifdef MTK_AOSP_ENHANCEMENT
-#ifndef MTK_EMULATOR_SUPPORT
-#include "mediatek/Resync.h"
-#endif
-#endif
 
 namespace android {
 
@@ -63,11 +58,6 @@ public:
             mPeriod(0),
             mPhase(0),
             mWakeupLatency(0) {
-#ifdef MTK_AOSP_ENHANCEMENT
-#ifndef MTK_EMULATOR_SUPPORT
-        mResync = NULL;
-#endif
-#endif
     }
 
     virtual ~DispSyncThread() {}
@@ -76,11 +66,6 @@ public:
         Mutex::Autolock lock(mMutex);
         mPeriod = period;
         mPhase = phase;
-#ifdef MTK_AOSP_ENHANCEMENT
-#ifndef MTK_EMULATOR_SUPPORT
-        if (mResync != NULL) mResync->updateModelLocked(mPeriod, mPhase);
-#endif
-#endif
         mCond.signal();
     }
 
@@ -123,9 +108,6 @@ public:
                 bool isWakeup = false;
 
                 if (now < targetTime) {
-#ifdef MTK_AOSP_ENHANCEMENT
-                    //ATRACE_INT64("DispSync:Wait", targetTime - now);
-#endif
                     err = mCond.waitRelative(mMutex, targetTime - now);
 
                     if (err == TIMED_OUT) {
@@ -260,15 +242,6 @@ private:
     nsecs_t computeListenerNextEventTimeLocked(const EventListener& listener,
             nsecs_t ref) {
 
-#ifdef MTK_AOSP_ENHANCEMENT
-#ifndef MTK_EMULATOR_SUPPORT
-        if (mResync != NULL) {
-            nsecs_t t = mResync->computeNextEventTimeLocked(
-                            listener.mPhase, listener.mLastEventTime, ref);
-            return t;
-        }
-#endif
-#endif
         nsecs_t lastEventTime = listener.mLastEventTime;
         if (ref < lastEventTime) {
             ref = lastEventTime;
@@ -300,30 +273,6 @@ private:
 
     Mutex mMutex;
     Condition mCond;
-
-#ifdef MTK_AOSP_ENHANCEMENT
-#ifndef MTK_EMULATOR_SUPPORT
-    sp<Resync> mResync;
-
-public:
-    void setResync(sp<Resync> resync, int num) {
-        Mutex::Autolock lock(mMutex);
-        mResync = resync;
-        if (mResync != NULL) mResync->setSyncSampleNumLocked(num);
-    }
-
-    void updateSyncTime(int num, nsecs_t sync) {
-        Mutex::Autolock lock(mMutex);
-        if (mResync != NULL) mResync->updateSyncTimeLocked(num, sync);
-    }
-
-    nsecs_t queryPeriod() {
-        Mutex::Autolock lock(mMutex);
-        if (mResync != NULL) return mResync->queryPeriodLocked();
-        return 0;
-    }
-#endif
-#endif
 };
 
 class ZeroPhaseTracer : public DispSync::Callback {
@@ -414,12 +363,6 @@ bool DispSync::addResyncSample(nsecs_t timestamp) {
         mFirstResyncSample = (mFirstResyncSample + 1) % MAX_RESYNC_SAMPLES;
     }
 
-#ifdef MTK_AOSP_ENHANCEMENT
-#ifndef MTK_EMULATOR_SUPPORT
-    mThread->updateSyncTime(mNumResyncSamples, timestamp);
-#endif
-#endif
-
     updateModelLocked();
 
     if (mNumResyncSamplesSincePresent++ > MAX_RESYNC_SAMPLES_WITHOUT_PRESENT) {
@@ -444,12 +387,6 @@ void DispSync::endResync() {
 status_t DispSync::addEventListener(nsecs_t phase,
         const sp<Callback>& callback) {
 
-#ifdef MTK_AOSP_ENHANCEMENT
-#ifndef MTK_EMULATOR_SUPPORT
-    nsecs_t period = mThread->queryPeriod();
-    if (period > 0) setPeriod(period);
-#endif
-#endif
     Mutex::Autolock lock(mMutex);
     return mThread->addEventListener(phase, callback);
 }
@@ -470,12 +407,6 @@ void DispSync::setPeriod(nsecs_t period) {
     Mutex::Autolock lock(mMutex);
     mPeriod = period;
     mPhase = 0;
-#ifdef MTK_AOSP_ENHANCEMENT
-    if (kTraceDetailedInfo) {
-        ATRACE_INT64("DispSync:Period", mPeriod);
-        ATRACE_INT64("DispSync:Phase", mPhase);
-    }
-#endif
     mThread->updateModel(mPeriod, mPhase);
 }
 
@@ -484,15 +415,6 @@ nsecs_t DispSync::getPeriod() {
     Mutex::Autolock lock(mMutex);
     return mPeriod;
 }
-
-#ifdef MTK_AOSP_ENHANCEMENT
-#ifndef MTK_EMULATOR_SUPPORT
-void DispSync::setResync(sp<Resync> resync) {
-    Mutex::Autolock lock(mMutex);
-    mThread->setResync(resync, MIN_RESYNC_SAMPLES_FOR_UPDATE);
-}
-#endif
-#endif
 
 void DispSync::updateModelLocked() {
     if (mNumResyncSamples >= MIN_RESYNC_SAMPLES_FOR_UPDATE) {

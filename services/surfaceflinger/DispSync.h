@@ -41,11 +41,6 @@ static const bool kIgnorePresentFences = false;
 class String8;
 class Fence;
 class DispSyncThread;
-#ifdef MTK_AOSP_ENHANCEMENT
-#ifndef MTK_EMULATOR_SUPPORT
-class Resync;
-#endif
-#endif
 
 // DispSync maintains a model of the periodic hardware-based vsync events of a
 // display and uses that model to execute period callbacks at specific phase
@@ -181,13 +176,6 @@ private:
 
     // mMutex is used to protect access to all member variables.
     mutable Mutex mMutex;
-
-#ifdef MTK_AOSP_ENHANCEMENT
-#ifndef MTK_EMULATOR_SUPPORT
-public:
-    void setResync(sp<Resync> resync);
-#endif
-#endif
 };
 
 }

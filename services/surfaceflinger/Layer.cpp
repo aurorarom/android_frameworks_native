@@ -1,9 +1,4 @@
 /*
-* Copyright (C) 2014 MediaTek Inc.
-* Modification based on code covered by the mentioned copyright
-* and/or permission notice(s).
-*/
-/*
  * Copyright (C) 2007 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -189,15 +184,6 @@ Layer::~Layer() {
     }
     mFlinger->deleteTextureAsync(mTextureName);
     mFrameTracker.logAndResetStats(mName);
-#ifdef MTK_AOSP_ENHANCEMENT
-    // try to delete the protect image texture, if layer may use it
-    if (CC_UNLIKELY(isProtected())) {
-        uint32_t tex = mFlinger->getRenderEngine().getAndClearProtectImageTexName();
-        if (-1 != tex) {
-            mFlinger->deleteTextureAsync(tex);
-        }
-    }
-#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -604,11 +590,6 @@ void Layer::setGeometry(
     if (orientation & Transform::ROT_INVALID) {
         // we can only handle simple transformation
         layer.setSkip(true);
-#ifdef MTK_AOSP_ENHANCEMENT
-        if (isDim()) {
-            layer.setTransform(orientation);
-        }
-#endif
     } else {
         layer.setTransform(orientation);
     }
@@ -630,11 +611,6 @@ void Layer::setPerFrameData(const sp<const DisplayDevice>& hw,
     if (mSidebandStream.get()) {
         layer.setSidebandStream(mSidebandStream);
     } else {
-#ifdef MTK_AOSP_ENHANCEMENT
-        // set dim flag if needed
-        layer.setDim(isDim());
-#endif
-
         // NOTE: buffer can be NULL if the client never drew into this
         // layer yet, or if we ran out of memory
         layer.setBuffer(mActiveBuffer);
@@ -852,13 +828,6 @@ void Layer::onDraw(const sp<const DisplayDevice>& hw, const Region& clip,
 
         engine.setupLayerTexturing(mTexture);
     } else {
-#ifdef MTK_AOSP_ENHANCEMENT
-        char value[PROPERTY_VALUE_MAX];
-        property_get("debug.sf.no_security_img", value, "0");
-        if (atoi(value) == 0)
-            engine.setupLayerProtectImage();
-        else
-#endif
         engine.setupLayerBlackedOut();
     }
     drawWithOpenGL(hw, clip, useIdentityTransform);
@@ -1168,16 +1137,6 @@ uint32_t Layer::doTransaction(uint32_t flags) {
 
 void Layer::commitTransaction() {
     mDrawingState = mCurrentState;
-
-#ifdef MTK_AOSP_ENHANCEMENT
-    // dump state result after transaction committed
-    if (CC_UNLIKELY(mFlinger->sPropertiesState.mLogTransaction)) {
-        String8 result;
-        Colorizer colorizer(false);
-        Layer::dump(result, colorizer);
-        XLOGD("%s", result.string());
-    }
-#endif
 }
 
 uint32_t Layer::getTransactionFlags(uint32_t flags) {
@@ -1429,12 +1388,6 @@ Region Layer::latchBuffer(bool& recomputeVisibleRegions)
                         // reject this buffer
                         ALOGE("rejecting buffer: bufWidth=%d, bufHeight=%d, front.active.{w=%d, h=%d}",
                                 bufWidth, bufHeight, front.active.w, front.active.h);
-#ifdef MTK_AOSP_ENHANCEMENT
-                        char msg[1024];
-                        snprintf(msg, 1024, "GraphicBuffer(%p) is rejected", buf.get());
-                        ALOGW("%s", msg);
-                        ATRACE_NAME(msg);
-#endif
                         return true;
                     }
                 }
@@ -1620,13 +1573,6 @@ void Layer::dump(String8& result, Colorizer& colorizer) const
             " queued-frames=%d, mRefreshPending=%d\n",
             mFormat, w0, h0, s0,f0,
             mQueuedFrames, mRefreshPending);
-
-#ifdef MTK_AOSP_ENHANCEMENT
-    result.appendFormat(
-            "      "
-            "mSecure=%d, mProtectedByApp=%d, mFiltering=%d, mNeedsFiltering=%d\n",
-            mSecure, mProtectedByApp, mFiltering, mNeedsFiltering);
-#endif
 
     if (mSurfaceFlingerConsumer != 0) {
         mSurfaceFlingerConsumer->dump(result, "            ");

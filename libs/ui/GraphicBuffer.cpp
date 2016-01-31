@@ -1,9 +1,4 @@
 /*
-* Copyright (C) 2014 MediaTek Inc.
-* Modification based on code covered by the mentioned copyright
-* and/or permission notice(s).
-*/
-/*
  * Copyright (C) 2007 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,10 +27,6 @@
 #include <ui/GraphicBufferAllocator.h>
 #include <ui/GraphicBufferMapper.h>
 #include <ui/PixelFormat.h>
-
-#ifdef MTK_AOSP_ENHANCEMENT 
-#include <ui/mediatek/RefBaseDump.h>
-#endif
 
 namespace android {
 
@@ -105,12 +96,6 @@ GraphicBuffer::GraphicBuffer(uint32_t w, uint32_t h,
     format = inFormat;
     usage  = inUsage;
     handle = inHandle;
-
-#ifdef MTK_AOSP_ENHANCEMENT 
-    RefBaseMonitor::getInstance().monitor(this);
-    ALOGI("create GraphicBuffer by handle, handle(%p) (w:%d h:%d s:%d f:%#x u:%#08x) owner(%d)",
-          handle, width, height, stride, format, usage, mOwner);
-#endif
 }
 
 GraphicBuffer::GraphicBuffer(ANativeWindowBuffer* buffer, bool keepOwnership)
@@ -124,19 +109,10 @@ GraphicBuffer::GraphicBuffer(ANativeWindowBuffer* buffer, bool keepOwnership)
     format = buffer->format;
     usage  = buffer->usage;
     handle = buffer->handle;
-
-#ifdef MTK_AOSP_ENHANCEMENT 
-    RefBaseMonitor::getInstance().monitor(this);
-    ALOGI("create GraphicBuffer by ANativeWindowBuffer, handle(%p) (w:%d h:%d s:%d f:%#x u:%#08x) owner(%d)",
-          handle, width, height, stride, format, usage, mOwner);
-#endif
 }
 
 GraphicBuffer::~GraphicBuffer()
 {
-#ifdef MTK_AOSP_ENHANCEMENT 
-    RefBaseMonitor::getInstance().unmonitor(this);
-#endif
     if (handle) {
         free_handle();
     }
@@ -145,18 +121,10 @@ GraphicBuffer::~GraphicBuffer()
 void GraphicBuffer::free_handle()
 {
     if (mOwner == ownHandle) {
-#ifdef MTK_AOSP_ENHANCEMENT 
-        ALOGD("unregister, handle(%p) (w:%d h:%d s:%d f:%#x u:%#08x)",
-              handle, width, height, stride, format, usage);
-#endif
         mBufferMapper.unregisterBuffer(handle);
         native_handle_close(handle);
         native_handle_delete(const_cast<native_handle*>(handle));
     } else if (mOwner == ownData) {
-#ifdef MTK_AOSP_ENHANCEMENT 
-        ALOGD("free, handle(%p) (w:%d h:%d s:%d f:%#x u:%#08x)",
-              handle, width, height, stride, format, usage);
-#endif
         GraphicBufferAllocator& allocator(GraphicBufferAllocator::get());
         allocator.free(handle);
     }
@@ -201,12 +169,6 @@ status_t GraphicBuffer::initSize(uint32_t w, uint32_t h, PixelFormat format,
 {
     GraphicBufferAllocator& allocator = GraphicBufferAllocator::get();
     status_t err = allocator.alloc(w, h, format, reqUsage, &handle, &stride);
-    
-#ifdef MTK_AOSP_ENHANCEMENT 
-    ALOGD("alloc, handle(%p) (w:%d h:%d s:%d f:%#x u:%#08x) err(%d)",
-          handle, w, h, stride, format, reqUsage, err);
-#endif
-
     if (err == NO_ERROR) {
         this->width  = w;
         this->height = h;
@@ -433,10 +395,6 @@ status_t GraphicBuffer::unflatten(
 
     if (handle != 0) {
         status_t err = mBufferMapper.registerBuffer(handle);
-#ifdef MTK_AOSP_ENHANCEMENT 
-        ALOGD("register, handle(%p) (w:%d h:%d s:%d f:%#x u:%#08x)",
-              handle, width, height, stride, format, usage);
-#endif
         if (err != NO_ERROR) {
             width = height = stride = format = usage = 0;
             handle = NULL;

@@ -1,9 +1,4 @@
 /*
-* Copyright (C) 2014 MediaTek Inc.
-* Modification based on code covered by the mentioned copyright
-* and/or permission notice(s).
-*/
-/*
 ** Copyright 2008, The Android Open Source Project
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
@@ -942,7 +937,6 @@ static int validate_path(const dir_rec_t* dir, const char* path) {
  * if it is a system app or -1 if it is not.
  */
 int validate_system_app_path(const char* path) {
-#if 0
     size_t i;
 
     for (i = 0; i < android_system_dirs.count; i++) {
@@ -953,15 +947,6 @@ int validate_system_app_path(const char* path) {
     }
 
     return -1;
-#else
-// M: path not in /data/app was system app
-    static const char* data_dir = "/data/app/";
-    size_t data_dir_len = strlen(data_dir);
-    if (!strncmp(path, data_dir, data_dir_len))
-        return -1;
-    else
-        return 0;
-#endif
 }
 
 /**
@@ -1127,51 +1112,6 @@ int ensure_media_user_dirs(userid_t userid) {
     return 0;
 }
 
-int64_t cal_dir_size(const char *dirname)
-{
-    DIR *dir;
-    struct dirent *de;
-    struct stat st;
-    char buf[PATH_MAX];
-    int64_t totalsize = 0LL;
-
-
-    if (!(dir = opendir(dirname)))  {
-        ALOGD("Couldn't open %s: %s\n", dirname, strerror(errno));
-        return totalsize;
-    }
-
-    while ((de = readdir(dir)))  {
-
-        if (de->d_name[0] == '.')  {
-            if (de->d_name[1] == 0) continue;
-            if ((de->d_name[1] == '.') && (de->d_name[2] == 0)) continue;
-        }
-
-        sprintf(buf, "%s/%s", dirname, de->d_name);
-
-        if (lstat(buf, &st) == -1)  {
-            ALOGD("Couldn't stat %s: %s\n", buf, strerror(errno));
-            continue;
-        }
-
-        if (de->d_type == DT_DIR) {
-            int64_t dirsize = cal_dir_size(buf);
-            ALOGD("\t%s total: %" PRId64 " bytes\n", buf, dirsize);
-            totalsize += dirsize;
-        }
-        else if (de->d_type == DT_REG)  {
-            ALOGD("%s: %ld\n", buf, (long) st.st_size);
-            totalsize += st.st_size;
-        }
-        else  {
-            ALOGD("cal_dir_size : type=%X", de->d_type);
-        }
-    }
-
-    closedir(dir);
-    return totalsize;
-}
 int ensure_config_user_dirs(userid_t userid) {
     char config_user_path[PATH_MAX];
     char path[PATH_MAX];

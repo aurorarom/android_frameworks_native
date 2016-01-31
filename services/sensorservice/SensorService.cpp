@@ -1,9 +1,4 @@
 /*
-* Copyright (C) 2014 MediaTek Inc.
-* Modification based on code covered by the mentioned copyright
-* and/or permission notice(s).
-*/
-/*
  * Copyright (C) 2010 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -313,28 +308,18 @@ status_t SensorService::dump(int fd, const Vector<String16>& /*args*/)
                     break;
                 case SENSOR_TYPE_MAGNETIC_FIELD_UNCALIBRATED:
                 case SENSOR_TYPE_GYROSCOPE_UNCALIBRATED:
-                case SENSOR_TYPE_ACTIVITY:
                     result.appendFormat(
                             "last=<%5.1f,%5.1f,%5.1f,%5.1f,%5.1f,%5.1f, %" PRId64 ">\n",
                             e.data[0], e.data[1], e.data[2], e.data[3], e.data[4], e.data[5],
                             e.timestamp);
                     break;
                 case SENSOR_TYPE_GAME_ROTATION_VECTOR:
-                case SENSOR_TYPE_PEDOMETER:                
-                case SENSOR_TYPE_HEART_RATE:                
                     result.appendFormat(
                             "last=<%5.1f,%5.1f,%5.1f,%5.1f, %" PRId64 ">\n",
                             e.data[0], e.data[1], e.data[2], e.data[3], e.timestamp);
                     break;
                 case SENSOR_TYPE_SIGNIFICANT_MOTION:
                 case SENSOR_TYPE_STEP_DETECTOR:
-                case SENSOR_TYPE_IN_POCKET:
-                case SENSOR_TYPE_FACE_DOWN:
-                case SENSOR_TYPE_SHAKE:
-                case SENSOR_TYPE_PICK_UP_GESTURE:
-                case SENSOR_TYPE_TILT_DETECTOR:
-                case SENSOR_TYPE_WAKE_GESTURE:
-                case SENSOR_TYPE_GLANCE_GESTURE:
                     result.appendFormat( "last=<%f %" PRId64 ">\n", e.data[0], e.timestamp);
                     break;
                 case SENSOR_TYPE_STEP_COUNTER:
@@ -721,7 +706,7 @@ void SensorService::cleanupConnection(SensorEventConnection* c)
         } else {
             i++;
         }
-    } 
+    }
     c->updateLooperRegistration(mLooper);
     mActiveConnections.remove(connection);
     BatteryService::cleanup(c->getUid());

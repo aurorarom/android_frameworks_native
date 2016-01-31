@@ -1,9 +1,4 @@
 /*
-* Copyright (C) 2014 MediaTek Inc.
-* Modification based on code covered by the mentioned copyright
-* and/or permission notice(s).
-*/
-/*
 ** Copyright 2008, The Android Open Source Project
 **
 ** Licensed under the Apache License, Version 2.0 (the "License"); 
@@ -100,7 +95,6 @@ static int do_get_size(char **arg, char reply[REPLY_MAX])
     int64_t asecsize = 0;
     int res = 0;
 
-    //ALOGD("do_get_size : %s %s %s %s %s %s %s", arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6]);
         /* pkgdir, userid, apkpath */
     res = get_size(arg[0], atoi(arg[1]), arg[2], arg[3], arg[4], arg[5],
             arg[6], &codesize, &datasize, &cachesize, &asecsize);
@@ -318,11 +312,6 @@ void free_globals() {
     }
 
     free(android_system_dirs.dirs);
-
-#ifdef MTK_OAT_ON_SDCARD_SUPPORT
-    //free ext sdcard path
-    free(android_ext_dalvik_cache_dir.path);
-#endif
 }
 
 int initialize_globals() {
@@ -383,14 +372,6 @@ int initialize_globals() {
     android_system_dirs.dirs[3].path = "/oem/app/";
     android_system_dirs.dirs[3].len = strlen(android_system_dirs.dirs[3].path);
 
-#ifdef MTK_OAT_ON_SDCARD_SUPPORT
-    //init ext sdcard path
-    char  external_sd_path[PROPERTY_VALUE_MAX];
-    property_get("external_sd_path", external_sd_path, DEFAULT_EXT_DALVIK_CACHE_PREFIX);
-    android_ext_dalvik_cache_dir.path = build_string2(external_sd_path, "/dalvik-cache/");
-    android_ext_dalvik_cache_dir.len = strlen(android_ext_dalvik_cache_dir.path);
-#endif
-
     return 0;
 }
 
@@ -436,82 +417,73 @@ int initialize_directories() {
         }
     }
 
-    if (access(android_media_dir.path, F_OK) == -1) {
+    if (version == 0) {
+        // Introducing multi-user, so migrate /data/media contents into /data/media/0
+        ALOGD("Upgrading /data/media for multi-user");
+
         // Ensure /data/media
         if (fs_prepare_dir(android_media_dir.path, 0770, AID_MEDIA_RW, AID_MEDIA_RW) == -1) {
             goto fail;
         }
-    }
 
-    bool is_multi_user_supported = getenv("EMULATED_STORAGE_TARGET") != NULL;
-    if (version == 0) {
-        if(is_multi_user_supported){
-            // Introducing multi-user, so migrate /data/media contents into /data/media/0
-            ALOGD("Upgrading /data/media for multi-user");
+        // /data/media.tmp
+        char media_tmp_dir[PATH_MAX];
+        snprintf(media_tmp_dir, PATH_MAX, "%smedia.tmp", android_data_dir.path);
+
+        // Only copy when upgrade not already in progress
+        if (access(media_tmp_dir, F_OK) == -1) {
+            if (rename(android_media_dir.path, media_tmp_dir) == -1) {
+                ALOGE("Failed to move legacy media path: %s", strerror(errno));
+                goto fail;
+            }
         }
-        else
-            ALOGD("multi-user was not enabled, don't migrate /data/media contents into /data/media/0");
 
-        if(is_multi_user_supported){
-            // /data/media.tmp
-            char media_tmp_dir[PATH_MAX];
-            snprintf(media_tmp_dir, PATH_MAX, "%smedia.tmp", android_data_dir.path);
+        // Create /data/media again
+        if (fs_prepare_dir(android_media_dir.path, 0770, AID_MEDIA_RW, AID_MEDIA_RW) == -1) {
+            goto fail;
+        }
 
-            // Only copy when upgrade not already in progress
-            if (access(media_tmp_dir, F_OK) == -1) {
-                if (rename(android_media_dir.path, media_tmp_dir) == -1) {
-                    ALOGE("Failed to move legacy media path: %s", strerror(errno));
-                    goto fail;
-                }
-            }
+        if (selinux_android_restorecon(android_media_dir.path, 0)) {
+            goto fail;
+        }
 
-            // Create /data/media again
-            if (fs_prepare_dir(android_media_dir.path, 0770, AID_MEDIA_RW, AID_MEDIA_RW) == -1) {
+        // /data/media/0
+        char owner_media_dir[PATH_MAX];
+        snprintf(owner_media_dir, PATH_MAX, "%s0", android_media_dir.path);
+
+        // Move any owner data into place
+        if (access(media_tmp_dir, F_OK) == 0) {
+            if (rename(media_tmp_dir, owner_media_dir) == -1) {
+                ALOGE("Failed to move owner media path: %s", strerror(errno));
                 goto fail;
             }
+        }
 
-            if (selinux_android_restorecon(android_media_dir.path, 0)) {
-                goto fail;
-            }
+        // Ensure media directories for any existing users
+        DIR *dir;
+        struct dirent *dirent;
+        char user_media_dir[PATH_MAX];
 
-            // /data/media/0
-            char owner_media_dir[PATH_MAX];
-            snprintf(owner_media_dir, PATH_MAX, "%s0", android_media_dir.path);
+        dir = opendir(user_data_dir);
+        if (dir != NULL) {
+            while ((dirent = readdir(dir))) {
+                if (dirent->d_type == DT_DIR) {
+                    const char *name = dirent->d_name;
 
-            // Move any owner data into place
-            if (access(media_tmp_dir, F_OK) == 0) {
-                if (rename(media_tmp_dir, owner_media_dir) == -1) {
-                    ALOGE("Failed to move owner media path: %s", strerror(errno));
-                    goto fail;
-                }
-            }
+                    // skip "." and ".."
+                    if (name[0] == '.') {
+                        if (name[1] == 0) continue;
+                        if ((name[1] == '.') && (name[2] == 0)) continue;
+                    }
 
-            // Ensure media directories for any existing users
-            DIR *dir;
-            struct dirent *dirent;
-            char user_media_dir[PATH_MAX];
-
-            dir = opendir(user_data_dir);
-            if (dir != NULL) {
-                while ((dirent = readdir(dir))) {
-                    if (dirent->d_type == DT_DIR) {
-                        const char *name = dirent->d_name;
-
-                        // skip "." and ".."
-                        if (name[0] == '.') {
-                            if (name[1] == 0) continue;
-                            if ((name[1] == '.') && (name[2] == 0)) continue;
-                        }
-
-                        // /data/media/<user_id>
-                        snprintf(user_media_dir, PATH_MAX, "%s%s", android_media_dir.path, name);
-                        if (fs_prepare_dir(user_media_dir, 0770, AID_MEDIA_RW, AID_MEDIA_RW) == -1) {
-                            goto fail;
-                        }
+                    // /data/media/<user_id>
+                    snprintf(user_media_dir, PATH_MAX, "%s%s", android_media_dir.path, name);
+                    if (fs_prepare_dir(user_media_dir, 0770, AID_MEDIA_RW, AID_MEDIA_RW) == -1) {
+                        goto fail;
                     }
                 }
-                closedir(dir);
             }
+            closedir(dir);
         }
 
         version = 1;
@@ -541,13 +513,10 @@ int initialize_directories() {
         version = 2;
     }
 
-    if(is_multi_user_supported){
-        if (ensure_media_user_dirs(0) == -1) {
-            ALOGE("Failed to setup media for user 0");
-            goto fail;
-        }
+    if (ensure_media_user_dirs(0) == -1) {
+        ALOGE("Failed to setup media for user 0");
+        goto fail;
     }
-
     if (fs_prepare_dir(media_obb_dir, 0770, AID_MEDIA_RW, AID_MEDIA_RW) == -1) {
         goto fail;
     }
@@ -628,8 +597,6 @@ int initialize_directories() {
             goto fail;
         }
     }
-
-    sync();
 
     // Success!
     res = 0;

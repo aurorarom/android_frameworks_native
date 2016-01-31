@@ -1,9 +1,4 @@
 /*
-* Copyright (C) 2014 MediaTek Inc.
-* Modification based on code covered by the mentioned copyright
-* and/or permission notice(s).
-*/
-/*
  * Copyright (C) 2007 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,10 +31,6 @@
 
 #include <hardware/gralloc.h>
 
-#ifdef MTK_AOSP_ENHANCEMENT 
-#include <cutils/properties.h>
-#include <utils/CallStack.h>
-#endif
 
 namespace android {
 // ---------------------------------------------------------------------------
@@ -55,26 +46,10 @@ GraphicBufferMapper::GraphicBufferMapper()
     if (err == 0) {
         mAllocMod = (gralloc_module_t const *)module;
     }
-
-#ifdef MTK_AOSP_ENHANCEMENT 
-    char value[PROPERTY_VALUE_MAX];
-    property_get("debug.gbuf.callstack", value, "0");
-    mIsDumpCallStack = atoi(value);
-    if (true == mIsDumpCallStack) {
-        ALOGI("!!! dump GraphicBufferMapper callstack for pid:%d !!!", getpid());
-    }
-#endif
 }
 
 status_t GraphicBufferMapper::registerBuffer(buffer_handle_t handle)
 {
-#ifdef MTK_AOSP_ENHANCEMENT 
-    if (true == mIsDumpCallStack) {
-        ALOGD("[GraphicBufferMapper::registerBuffer] handle:%p", handle);
-        CallStack stack("    ");
-    }    
-#endif
-
     ATRACE_CALL();
     status_t err;
 
@@ -87,13 +62,6 @@ status_t GraphicBufferMapper::registerBuffer(buffer_handle_t handle)
 
 status_t GraphicBufferMapper::unregisterBuffer(buffer_handle_t handle)
 {
-#ifdef MTK_AOSP_ENHANCEMENT 
-    if (true == mIsDumpCallStack) {
-        ALOGD("[GraphicBufferMapper::unregisterBuffer] handle:%p", handle);
-        CallStack stack("    ");
-    }    
-#endif
-
     ATRACE_CALL();
     status_t err;
 

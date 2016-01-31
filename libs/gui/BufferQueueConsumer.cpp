@@ -1,9 +1,4 @@
 /*
-* Copyright (C) 2014 MediaTek Inc.
-* Modification based on code covered by the mentioned copyright
-* and/or permission notice(s).
-*/
-/*
  * Copyright 2014 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -135,15 +130,6 @@ status_t BufferQueueConsumer::acquireBuffer(BufferItem* outBuffer,
                     " size=%zu",
                     desiredPresent, expectedPresent, mCore->mQueue.size());
             if (mCore->stillTracking(front)) {
-#ifdef MTK_AOSP_ENHANCEMENT
-                BQ_LOGI("acquireBuffer: slot %d is dropped, handle=%p",
-                        front->mSlot, mSlots[front->mSlot].mGraphicBuffer->handle);
-
-                char ___traceBuf[128];
-                snprintf(___traceBuf, 128, "dropped:%d (h:%p)",
-                        front->mSlot, mSlots[front->mSlot].mGraphicBuffer->handle);
-                android::ScopedTrace ___bufTracer(ATRACE_TAG, ___traceBuf);
-#endif
                 // Front buffer is still in mSlots, so mark the slot as free
                 mSlots[front->mSlot].mBufferState = BufferSlot::FREE;
             }
@@ -160,29 +146,8 @@ status_t BufferQueueConsumer::acquireBuffer(BufferItem* outBuffer,
                     desiredPresent, expectedPresent,
                     desiredPresent - expectedPresent,
                     systemTime(CLOCK_MONOTONIC));
-#ifdef MTK_AOSP_ENHANCEMENT
-            if (mCore->debugger.mConnectedApi == NATIVE_WINDOW_API_MEDIA)
-            {
-                char ___traceBuf[128];
-                snprintf(___traceBuf, 128, " defer %s(us)", mCore->mConsumerName.string());
-                ATRACE_INT_PERF(___traceBuf, (desiredPresent - expectedPresent) / 1000);
-
-                snprintf(___traceBuf, 128, "desire=%" PRId64 " expect=%" PRId64,
-                        desiredPresent, expectedPresent);
-                ATRACE_NAME(___traceBuf);
-            }
-#endif
             return PRESENT_LATER;
         }
-
-#ifdef MTK_AOSP_ENHANCEMENT
-        if (mCore->debugger.mConnectedApi == NATIVE_WINDOW_API_MEDIA)
-        {
-            char ___traceBuf[128];
-            snprintf(___traceBuf, 128, " defer %s(us)", mCore->mConsumerName.string());
-            ATRACE_INT_PERF(___traceBuf, 0);
-        }
-#endif
 
         BQ_LOGV("acquireBuffer: accept desire=%" PRId64 " expect=%" PRId64 " "
                 "(%" PRId64 ") now=%" PRId64, desiredPresent, expectedPresent,
@@ -211,17 +176,6 @@ status_t BufferQueueConsumer::acquireBuffer(BufferItem* outBuffer,
         outBuffer->mGraphicBuffer = NULL;
     }
 
-#ifdef MTK_AOSP_ENHANCEMENT
-    // 1. for dump, buffers holded by BufferQueueDump should be updated
-    // 2. to draw white debug line
-    mCore->debugger.onAcquire(
-            slot,
-            front->mGraphicBuffer,
-            front->mFence,
-            front->mTimestamp,
-            outBuffer);
-#endif
-
     mCore->mQueue.erase(front);
 
     // We might have freed a slot while dropping old buffers, or the producer
@@ -229,11 +183,7 @@ status_t BufferQueueConsumer::acquireBuffer(BufferItem* outBuffer,
     // decrease.
     mCore->mDequeueCondition.broadcast();
 
-#ifdef MTK_AOSP_ENHANCEMENT
-    ATRACE_INT_PERF(mCore->mConsumerName.string(), mCore->mQueue.size());
-#else
     ATRACE_INT(mCore->mConsumerName.string(), mCore->mQueue.size());
-#endif
 
     return NO_ERROR;
 }
@@ -389,10 +339,6 @@ status_t BufferQueueConsumer::releaseBuffer(int slot, uint64_t frameNumber,
         }
 
         mCore->mDequeueCondition.broadcast();
-#ifdef MTK_AOSP_ENHANCEMENT
-        // for dump, buffers holded by BufferQueueDump should be updated
-        mCore->debugger.onRelease(slot);
-#endif
     } // Autolock scope
 
     // Call back without lock held
@@ -411,14 +357,9 @@ status_t BufferQueueConsumer::connect(
         BQ_LOGE("connect(C): consumerListener may not be NULL");
         return BAD_VALUE;
     }
-#ifdef MTK_AOSP_ENHANCEMENT
-    // to set process's name and pid of consumer
-    mCore->debugger.onConsumerConnect(consumerListener, controlledByApp);
-#else
 
     BQ_LOGV("connect(C): controlledByApp=%s",
             controlledByApp ? "true" : "false");
-#endif
 
     Mutex::Autolock lock(mCore->mMutex);
 
@@ -436,13 +377,7 @@ status_t BufferQueueConsumer::connect(
 status_t BufferQueueConsumer::disconnect() {
     ATRACE_CALL();
 
-#ifdef MTK_AOSP_ENHANCEMENT
-    // to reset pid of the consumer
-    mCore->debugger.onConsumerDisconnectHead();
-    BQ_LOGI("disconnect(C)");
-#else
     BQ_LOGV("disconnect(C)");
-#endif
 
     Mutex::Autolock lock(mCore->mMutex);
 
@@ -456,11 +391,6 @@ status_t BufferQueueConsumer::disconnect() {
     mCore->mQueue.clear();
     mCore->freeAllBuffersLocked();
     mCore->mDequeueCondition.broadcast();
-#ifdef MTK_AOSP_ENHANCEMENT
-    // NOTE: this line must be placed after lock(mMutex)
-    // for dump, buffers holded by BufferQueueDump should be updated
-    mCore->debugger.onConsumerDisconnectTail();
-#endif
     return NO_ERROR;
 }
 
@@ -497,11 +427,7 @@ status_t BufferQueueConsumer::getReleasedBuffers(uint64_t *outSlotMask) {
         ++current;
     }
 
-#ifdef MTK_AOSP_ENHANCEMENT
-    BQ_LOGI("getReleasedBuffers: returning mask %#" PRIx64, mask);
-#else
     BQ_LOGV("getReleasedBuffers: returning mask %#" PRIx64, mask);
-#endif
     *outSlotMask = mask;
     return NO_ERROR;
 }
@@ -516,11 +442,7 @@ status_t BufferQueueConsumer::setDefaultBufferSize(uint32_t width,
         return BAD_VALUE;
     }
 
-#ifdef MTK_AOSP_ENHANCEMENT
-    BQ_LOGI("setDefaultBufferSize: width=%u height=%u", width, height);
-#else
     BQ_LOGV("setDefaultBufferSize: width=%u height=%u", width, height);
-#endif
 
     Mutex::Autolock lock(mCore->mMutex);
     mCore->mDefaultWidth = width;
@@ -578,10 +500,6 @@ void BufferQueueConsumer::setConsumerName(const String8& name) {
     Mutex::Autolock lock(mCore->mMutex);
     mCore->mConsumerName = name;
     mConsumerName = name;
-#ifdef MTK_AOSP_ENHANCEMENT
-    // update dump info and prepare for drawing debug line
-    mCore->debugger.onSetConsumerName(name);
-#endif
 }
 
 status_t BufferQueueConsumer::setDefaultBufferFormat(uint32_t defaultFormat) {

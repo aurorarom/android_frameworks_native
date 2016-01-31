@@ -1,9 +1,4 @@
 /*
-* Copyright (C) 2014 MediaTek Inc.
-* Modification based on code covered by the mentioned copyright
-* and/or permission notice(s).
-*/
-/*
  * Copyright (C) 2005 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -59,7 +54,7 @@ TextOutput& operator<<(TextOutput& to, int val)
 
 TextOutput& operator<<(TextOutput& to, long val)
 {
-    char buf[32];
+    char buf[16];
     sprintf(buf, "%ld", val);
     to.print(buf, strlen(buf));
     return to;
@@ -75,7 +70,7 @@ TextOutput& operator<<(TextOutput& to, unsigned int val)
 
 TextOutput& operator<<(TextOutput& to, unsigned long val)
 {
-    char buf[32];
+    char buf[16];
     sprintf(buf, "%lu", val);
     to.print(buf, strlen(buf));
     return to;

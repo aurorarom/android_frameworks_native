@@ -1,9 +1,4 @@
 /*
-* Copyright (C) 2014 MediaTek Inc.
-* Modification based on code covered by the mentioned copyright
-* and/or permission notice(s).
-*/
-/*
  * Copyright (C) 2007 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -54,12 +49,6 @@ enum {
     DISPLAY_ORIENTATION_180 = 2,
     DISPLAY_ORIENTATION_270 = 3
 };
-
-#ifdef MTK_AOSP_ENHANCEMENT 
-struct DisplayInfoEx {
-    uint8_t subtype;
-};
-#endif
 
 }; // namespace android
 

@@ -1,9 +1,4 @@
 /*
-* Copyright (C) 2014 MediaTek Inc.
-* Modification based on code covered by the mentioned copyright
-* and/or permission notice(s).
-*/
-/*
  * Copyright (C) 2006 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -48,10 +43,6 @@ class DisplayStatInfo;
 class IDisplayEventConnection;
 class IMemoryHeap;
 class Rect;
-
-#ifdef MTK_AOSP_ENHANCEMENT 
-class DisplayInfoEx;
-#endif
 
 /*
  * This class defines the Binder IPC interface for accessing various
@@ -180,9 +171,6 @@ public:
      * Requires the ACCESS_SURFACE_FLINGER permission.
      */
     virtual status_t getAnimationFrameStats(FrameStats* outStats) const = 0;
-#ifdef MTK_AOSP_ENHANCEMENT 
-    virtual status_t getDisplayInfoEx(const sp<IBinder>& display, DisplayInfoEx* info) = 0;
-#endif
 };
 
 // ----------------------------------------------------------------------------
@@ -213,9 +201,6 @@ public:
         GET_ANIMATION_FRAME_STATS,
         SET_POWER_MODE,
         GET_DISPLAY_STATS,
-#ifdef MTK_AOSP_ENHANCEMENT 
-        GET_DISPLAY_INFO_EX,
-#endif
     };
 
     virtual status_t onTransact(uint32_t code, const Parcel& data,

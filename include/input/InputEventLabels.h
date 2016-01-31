@@ -1,9 +1,4 @@
 /*
-* Copyright (C) 2014 MediaTek Inc.
-* Modification based on code covered by the mentioned copyright
-* and/or permission notice(s).
-*/
-/*
  * Copyright (C) 2008 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -304,12 +299,6 @@ static const InputEventLabel KEYCODES[] = {
     DEFINE_KEYCODE(TV_MEDIA_CONTEXT_MENU),
     DEFINE_KEYCODE(TV_TIMER_PROGRAMMING),
     DEFINE_KEYCODE(HELP),
-    DEFINE_KEYCODE(WIFI_TOGGLE),
-    DEFINE_KEYCODE(BT_TOGGLE),
-    DEFINE_KEYCODE(LOCK_TOGGLE),
-    DEFINE_KEYCODE(IME_TOGGLE),
-    DEFINE_KEYCODE(MESSAGING),
-    DEFINE_KEYCODE(GALLERY),
 
     { NULL, 0 }
 };
