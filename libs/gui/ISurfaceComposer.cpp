@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2007 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -316,6 +321,18 @@ public:
         reply.read(*outStats);
         return reply.readInt32();
     }
+
+#ifdef MTK_AOSP_ENHANCEMENT
+    virtual status_t getDisplayInfoEx(const sp<IBinder>& display, DisplayInfoEx* info)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(ISurfaceComposer::getInterfaceDescriptor());
+        data.writeStrongBinder(display);
+        remote()->transact(BnSurfaceComposer::GET_DISPLAY_INFO_EX, data, &reply);
+        memcpy(info, reply.readInplace(sizeof(DisplayInfoEx)), sizeof(DisplayInfoEx));
+        return reply.readInt32();
+    }
+#endif
 };
 
 IMPLEMENT_META_INTERFACE(SurfaceComposer, "android.ui.ISurfaceComposer");
@@ -521,6 +538,17 @@ status_t BnSurfaceComposer::onTransact(
             setPowerMode(display, mode);
             return NO_ERROR;
         }
+#ifdef MTK_AOSP_ENHANCEMENT
+        case GET_DISPLAY_INFO_EX: {
+            CHECK_INTERFACE(ISurfaceComposer, data, reply);
+            DisplayInfoEx info;
+            sp<IBinder> display = data.readStrongBinder();
+            status_t result = getDisplayInfoEx(display, &info);
+            memcpy(reply->writeInplace(sizeof(DisplayInfoEx)), &info, sizeof(DisplayInfoEx));
+            reply->writeInt32(result);
+            return NO_ERROR;
+        }
+#endif
         default: {
             return BBinder::onTransact(code, data, reply, flags);
         }

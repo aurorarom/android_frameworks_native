@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2007 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -269,6 +274,11 @@ void DisplayDevice::swapBuffers(HWComposer& hwc) const {
     if (hwc.initCheck() != NO_ERROR ||
             (hwc.hasGlesComposition(mHwcDisplayId) &&
              (hwc.supportsFramebufferTarget() || mType >= DISPLAY_VIRTUAL))) {
+#ifdef MTK_AOSP_ENHANCEMENT
+        // debug line that indicates we are using G3D rendering
+        if (CC_UNLIKELY(mFlinger->sPropertiesState.mLineG3D))
+            drawDebugLine();
+#endif
         EGLBoolean success = eglSwapBuffers(mDisplay, mSurface);
         if (!success) {
             EGLint error = eglGetError();
@@ -288,6 +298,18 @@ void DisplayDevice::swapBuffers(HWComposer& hwc) const {
         ALOGE("[%s] failed pushing new frame to HWC: %d",
                 mDisplayName.string(), result);
     }
+
+#ifdef MTK_AOSP_ENHANCEMENT
+    // log display device FPS info for performace check
+    if (true == mFps.update()) {
+        ALOGI("[%s (type:%d)] fps:%f,dur:%.2f,max:%.2f,min:%.2f",
+            mDisplayName.string(), mType,
+            mFps.getFps(),
+            mFps.getLastLogDuration() / 1e6,
+            mFps.getMaxDuration() / 1e6,
+            mFps.getMinDuration() / 1e6);
+    }
+#endif
 }
 
 void DisplayDevice::onSwapBuffersCompleted(HWComposer& hwc) const {
@@ -505,6 +527,16 @@ void DisplayDevice::setProjection(int orientation,
 
     dirtyRegion.set(getBounds());
 
+#ifdef MTK_AOSP_ENHANCEMENT
+    // for boot animation black screen issue
+    if ((false == mFlinger->getBootFinished()) && (DISPLAY_PRIMARY == mType)) {
+        ALOGI("[%s] clear DisplayDevice(type:%d) dirty region while booting",
+            __FUNCTION__, mType);
+
+        dirtyRegion.clear();
+    }
+#endif
+
     Transform TL, TP, S;
     float src_width  = viewport.width();
     float src_height = viewport.height();
@@ -522,6 +554,16 @@ void DisplayDevice::setProjection(int orientation,
     float dst_y = frame.top;
     TL.set(-src_x, -src_y);
     TP.set(dst_x, dst_y);
+
+#ifdef MTK_AOSP_ENHANCEMENT
+    // need to take care of HW rotation for mGlobalTransform
+    // for case if the panel is not installed align with device orientation
+    if (DisplayState::eOrientationDefault != mHwOrientation) {
+        DisplayDevice::orientationToTransfrom(
+            (orientation + mHwOrientation) % (DisplayState::eOrientation270 + 1),
+            w, h, &R);
+    }
+#endif
 
     // The viewport and frame are both in the logical orientation.
     // Apply the logical translation, scale to physical size, apply the
@@ -565,6 +607,12 @@ void DisplayDevice::dump(String8& result) const {
         tr[0][0], tr[1][0], tr[2][0],
         tr[0][1], tr[1][1], tr[2][1],
         tr[0][2], tr[1][2], tr[2][2]);
+
+#ifdef MTK_AOSP_ENHANCEMENT
+    result.appendFormat(
+        "   hworient=%2d, mirror=%d\n",
+        mHwOrientation, mHwcMirrorId);
+#endif
 
     String8 surfaceDump;
     mDisplaySurface->dump(surfaceDump);

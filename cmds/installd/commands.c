@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
 ** Copyright 2008, The Android Open Source Project
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
@@ -115,8 +120,17 @@ int uninstall(const char *pkgname, userid_t userid)
 {
     char pkgdir[PKG_PATH_MAX];
 
+    ALOGD("uninstall : %s\n", pkgname);
+
+#ifdef MTK_OAT_ON_SDCARD_SUPPORT
+    if (create_pkg_path(pkgdir, pkgname, PKG_DIR_POSTFIX, userid))  {
+        ALOGD("uninstall : create_pkg_path fail\n");
+        return -1;
+    }
+#else
     if (create_pkg_path(pkgdir, pkgname, PKG_DIR_POSTFIX, userid))
         return -1;
+#endif
 
     remove_profile_file(pkgname);
 
@@ -161,6 +175,12 @@ int fix_uid(const char *pkgname, uid_t uid, gid_t gid)
 
     if (s.st_uid != 0 || s.st_gid != 0) {
         ALOGE("fixing uid of non-root pkg: %s %" PRIu32 " %" PRIu32 "\n", pkgdir, s.st_uid, s.st_gid);
+        return -1;
+    }
+
+    /// M: [PMS Recovery] Installd should first change the folder to its own
+    if (chown(pkgdir, AID_INSTALL, AID_INSTALL) < 0) {
+        ALOGE("failed to chown '%s': %s\n", pkgdir, strerror(errno));
         return -1;
     }
 
@@ -423,6 +443,8 @@ int move_dex(const char *src, const char *dst, const char *instruction_set)
     char src_dex[PKG_PATH_MAX];
     char dst_dex[PKG_PATH_MAX];
 
+    ALOGD("move_dex %s => %s", src, dst);
+
     if (validate_apk_path(src)) {
         ALOGE("invalid apk path '%s' (bad prefix)\n", src);
         return -1;
@@ -435,7 +457,43 @@ int move_dex(const char *src, const char *dst, const char *instruction_set)
     if (create_cache_path(src_dex, src, instruction_set)) return -1;
     if (create_cache_path(dst_dex, dst, instruction_set)) return -1;
 
-    ALOGV("move %s -> %s\n", src_dex, dst_dex);
+    ALOGD("move_dex %s => %s", src_dex, dst_dex);
+
+#ifdef MTK_OAT_ON_SDCARD_SUPPORT
+    struct stat st;
+    char odex_path[PKG_PATH_MAX];
+
+    memset(odex_path, 0x00, PKG_PATH_MAX);
+
+    if (lstat(src_dex, &st) < 0) {
+        if (errno != ENOENT) {
+            ALOGE("couldn't stat %s : %s\n", src_dex, strerror(errno));
+            return -1;
+        }
+    } else {
+        if (S_ISLNK(st.st_mode)) {
+            if (readlink(src_dex, odex_path, PKG_PATH_MAX) < 0)  {
+                ALOGE("couldn't readlink %s : %s", src_dex, strerror(errno));
+                return -1;
+            }
+            else   {
+                ALOGD("odex path  : %s", odex_path);
+                if (unlink(src_dex) < 0) {
+                    ALOGE("Couldn't unlink %s: %s\n", src_dex, strerror(errno));
+                    return -1;
+                }
+            }
+
+            if (symlink(odex_path, dst_dex) < 0) {
+                ALOGE("couldn't symlink '%s' -> '%s': %s\n", dst_dex, odex_path, strerror(errno));
+                return -1;
+            }
+            return 0;
+        }
+    }
+#endif
+
+    ALOGD("move %s -> %s\n", src_dex, dst_dex);
     if (rename(src_dex, dst_dex) < 0) {
         ALOGE("Couldn't move %s: %s\n", src_dex, strerror(errno));
         return -1;
@@ -448,12 +506,47 @@ int rm_dex(const char *path, const char *instruction_set)
 {
     char dex_path[PKG_PATH_MAX];
 
+#ifdef MTK_OAT_ON_SDCARD_SUPPORT
+    char symlink_path[PKG_PATH_MAX];
+
+    memset(symlink_path, 0x00, PKG_PATH_MAX);
+
     if (validate_apk_path(path) && validate_system_app_path(path)) {
         ALOGE("invalid apk path '%s' (bad prefix)\n", path);
         return -1;
     }
 
     if (create_cache_path(dex_path, path, instruction_set)) return -1;
+
+    ALOGD("rm_dex %s\n", dex_path);
+
+    struct stat st;
+
+    if (lstat(dex_path, &st) < 0) {
+        if (errno != ENOENT) {
+            ALOGE("couldn't stat %s : %s\n", dex_path, strerror(errno));
+        }
+    } else {
+        if (S_ISLNK(st.st_mode)) {
+            if (readlink(dex_path, symlink_path, PKG_PATH_MAX) < 0)  {
+                ALOGE("couldn't readlink %s : %s", dex_path, strerror(errno));
+            }
+            else   {
+                ALOGD("symlink path  : %s", symlink_path);
+                if (unlink(symlink_path) < 0) {
+                    ALOGE("1Couldn't unlink %s: %s\n", symlink_path, strerror(errno));
+                }
+            }
+        }
+    }
+#else
+    if (validate_apk_path(path) && validate_system_app_path(path)) {
+        ALOGE("invalid apk path '%s' (bad prefix)\n", path);
+        return -1;
+    }
+
+    if (create_cache_path(dex_path, path, instruction_set)) return -1;
+#endif
 
     ALOGV("unlink %s\n", dex_path);
     if (unlink(dex_path) < 0) {
@@ -476,6 +569,9 @@ int get_size(const char *pkgname, userid_t userid, const char *apkpath,
     struct dirent *de;
     struct stat s;
     char path[PKG_PATH_MAX];
+#ifdef CALCULATE_DIRECTORY_REAL_SIZE
+    char path2[PKG_PATH_MAX];
+#endif
 
     int64_t codesize = 0;
     int64_t datasize = 0;
@@ -559,7 +655,14 @@ int get_size(const char *pkgname, userid_t userid, const char *apkpath,
             if(!strcmp(name,"lib")) {
                 codesize += dirsize + statsize;
             } else if(!strcmp(name,"cache")) {
+
+#ifdef CALCULATE_DIRECTORY_REAL_SIZE
+                strcpy(path2, path);
+                strncat(path2, "/cache", PKG_PATH_MAX - strlen(path2) - 1);
+                cachesize += cal_dir_size(path2);
+#else
                 cachesize += dirsize + statsize;
+#endif
             } else {
                 datasize += dirsize + statsize;
             }
@@ -624,6 +727,53 @@ int create_cache_path(char path[PKG_PATH_MAX], const char *src, const char *inst
 
     return 0;
 }
+
+#ifdef MTK_OAT_ON_SDCARD_SUPPORT
+int create_ext_cache_path(char path[PKG_PATH_MAX], const char *src)
+{
+    char *tmp;
+    int srclen;
+    int dstlen;
+
+    if (access(android_ext_dalvik_cache_dir.path, R_OK) < 0) {
+        if (mkdir(android_ext_dalvik_cache_dir.path, 0771) < 0) {
+            ALOGE("prepare_ext cache dir %s fail: %s", android_ext_dalvik_cache_dir.path, strerror(errno));
+            //return -1;
+        }
+    }
+
+    srclen = strlen(src);
+
+    /* demand that we are an absolute path */
+    if ((src == 0) || (src[0] != '/') || strstr(src,"..")) {
+        return -1;
+    }
+
+    if (srclen > PKG_PATH_MAX) {        // XXX: PKG_NAME_MAX?
+        return -1;
+    }
+
+    dstlen = srclen + strlen(android_ext_dalvik_cache_dir.path) +
+        strlen(DALVIK_CACHE_POSTFIX) + 1;
+
+    if (dstlen > PKG_PATH_MAX) {
+        return -1;
+    }
+
+    sprintf(path,"%s%s%s",
+            android_ext_dalvik_cache_dir.path,
+            src + 1, /* skip the leading / */
+            DALVIK_CACHE_POSTFIX);
+
+    for(tmp = path + strlen(android_ext_dalvik_cache_dir.path); *tmp; tmp++) {
+        if (*tmp == '/') {
+            *tmp = '@';
+        }
+    }
+
+    return 0;
+}
+#endif
 
 static void run_dexopt(int zip_fd, int odex_fd, const char* input_file_name,
     const char* output_file_name)

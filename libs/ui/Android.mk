@@ -1,3 +1,8 @@
+#
+# Copyright (C) 2014 MediaTek Inc.
+# Modification based on code covered by the mentioned copyright
+# and/or permission notice(s).
+#
 # Copyright (C) 2010 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,6 +38,28 @@ LOCAL_SHARED_LIBRARIES := \
 	libsync \
 	libutils \
 	liblog
+
+# --- MediaTek -------------------------------------------------------------
+MTK_PATH = mediatek
+
+LOCAL_C_INCLUDES += \
+	external/libpng \
+	external/zlib \
+	external/skia/src/images \
+	external/skia/include/core
+
+ifneq (, $(findstring MTK_AOSP_ENHANCEMENT, $(COMMON_GLOBAL_CPPFLAGS)))
+	LOCAL_SRC_FILES += \
+		$(MTK_PATH)/Fence.cpp \
+		$(MTK_PATH)/IDumpTunnel.cpp \
+		$(MTK_PATH)/RefBaseDump.cpp
+endif
+
+LOCAL_SHARED_LIBRARIES += \
+	libbinder \
+	libdl \
+	libpng
+# --------------------------------------------------------------------------
 
 ifneq ($(BOARD_FRAMEBUFFER_FORCE_FORMAT),)
 LOCAL_CFLAGS += -DFRAMEBUFFER_FORCE_FORMAT=$(BOARD_FRAMEBUFFER_FORCE_FORMAT)

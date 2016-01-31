@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2007 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -46,6 +51,10 @@ class IMemoryHeap;
 class ISurfaceComposerClient;
 class IGraphicBufferProducer;
 class Region;
+
+#ifdef MTK_AOSP_ENHANCEMENT 
+class DisplayInfoEx;
+#endif
 
 // ---------------------------------------------------------------------------
 
@@ -190,6 +199,11 @@ private:
                 status_t                    mStatus;
                 sp<ISurfaceComposerClient>  mClient;
                 Composer&                   mComposer;
+
+#ifdef MTK_AOSP_ENHANCEMENT 
+public:
+    static status_t getDisplayInfoEx(const sp<IBinder>& display, DisplayInfoEx* info);
+#endif
 };
 
 // ---------------------------------------------------------------------------

@@ -1,3 +1,8 @@
+/*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
 /* ------------------------------------------------------------------
  * Copyright (C) 1998-2009 PacketVideo
  *
@@ -409,7 +414,13 @@ typedef struct OMX_PARAM_COMPONENTROLETYPE {
  */
 #define OMX_BUFFERFLAG_CODECCONFIG 0x00000080
 
-
+// for 3D stereo
+#if 0 //def MTK_S3D_SUPPORT
+#define OMX_BUFFERFLAG_3D_SIDEBYSIDE   0x00000200
+#define OMX_BUFFERFLAG_3D_TOPANDBOTTOM 0x00000400
+#define OMX_BUFFERFLAG_2D              0x00001000
+#endif
+//
 
 /** @ingroup buf */
 typedef struct OMX_BUFFERHEADERTYPE

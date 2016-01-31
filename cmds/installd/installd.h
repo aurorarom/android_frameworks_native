@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
 **
 ** Copyright 2008, The Android Open Source Project
 **
@@ -75,6 +80,10 @@
 #define DALVIK_CACHE_PREFIX    "/data/dalvik-cache/"
 #define DALVIK_CACHE_POSTFIX   "/classes.dex"
 
+#ifdef MTK_OAT_ON_SDCARD_SUPPORT
+#define DEFAULT_EXT_DALVIK_CACHE_PREFIX   "/storage/sdcard1"
+#endif
+
 #define UPDATE_COMMANDS_DIR_PREFIX  "/system/etc/updatecmds/"
 
 #define IDMAP_PREFIX           "/data/resource-cache/"
@@ -94,6 +103,10 @@ typedef struct {
     size_t count;
     dir_rec_t* dirs;
 } dir_rec_array_t;
+
+#ifdef MTK_OAT_ON_SDCARD_SUPPORT
+extern dir_rec_t android_ext_dalvik_cache_dir;
+#endif
 
 extern dir_rec_t android_app_dir;
 extern dir_rec_t android_app_private_dir;
@@ -200,6 +213,8 @@ int ensure_config_user_dirs(userid_t userid);
 int create_profile_file(const char *pkgname, gid_t gid);
 void remove_profile_file(const char *pkgname);
 
+int64_t cal_dir_size(const char *dirname);
+
 /* commands.c */
 
 int install(const char *pkgname, uid_t uid, gid_t gid, const char *seinfo);
@@ -213,6 +228,9 @@ int delete_user(userid_t userid);
 int delete_cache(const char *pkgname, userid_t userid);
 int delete_code_cache(const char *pkgname, userid_t userid);
 int move_dex(const char *src, const char *dst, const char *instruction_set);
+#ifdef MTK_OAT_ON_SDCARD_SUPPORT
+int move_oat(const char *src, const char *instruction_set, uid_t uid, int is_public);
+#endif
 int rm_dex(const char *path, const char *instruction_set);
 int protect(char *pkgname, gid_t gid);
 int get_size(const char *pkgname, userid_t userid, const char *apkpath, const char *libdirpath,

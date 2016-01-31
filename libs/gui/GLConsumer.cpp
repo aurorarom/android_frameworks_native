@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2010 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,6 +45,10 @@
 #include <utils/Log.h>
 #include <utils/String8.h>
 #include <utils/Trace.h>
+
+#ifndef MTK_DEFAULT_AOSP
+#include <gralloc_mtk_defs.h>
+#endif
 
 EGLAPI const char* eglQueryStringImplementationANDROID(EGLDisplay dpy, EGLint name);
 #define CROP_EXT_STR "EGL_ANDROID_image_crop"
@@ -387,19 +396,26 @@ status_t GLConsumer::updateAndReleaseLocked(const BufferQueue::BufferItem& item)
         return err;
     }
 
-    // Ensure we have a valid EglImageKHR for the slot, creating an EglImage
-    // if nessessary, for the gralloc buffer currently in the slot in
-    // ConsumerBase.
-    // We may have to do this even when item.mGraphicBuffer == NULL (which
-    // means the buffer was previously acquired).
-    err = mEglSlots[buf].mEglImage->createIfNeeded(mEglDisplay, item.mCrop);
-    if (err != NO_ERROR) {
-        ST_LOGW("updateAndRelease: unable to createImage on display=%p slot=%d",
-                mEglDisplay, buf);
-        releaseBufferLocked(buf, mSlots[buf].mGraphicBuffer,
-                mEglDisplay, EGL_NO_SYNC_KHR);
-        return UNKNOWN_ERROR;
+#ifndef MTK_DEFAULT_AOSP
+    // do not create EGLImage if secure buffer
+    if (!(mSlots[buf].mGraphicBuffer->getUsage() & GRALLOC_USAGE_SECURE)) {
+#endif
+        // Ensure we have a valid EglImageKHR for the slot, creating an EglImage
+        // if nessessary, for the gralloc buffer currently in the slot in
+        // ConsumerBase.
+        // We may have to do this even when item.mGraphicBuffer == NULL (which
+        // means the buffer was previously acquired).
+        err = mEglSlots[buf].mEglImage->createIfNeeded(mEglDisplay, item.mCrop);
+        if (err != NO_ERROR) {
+            ST_LOGW("updateAndRelease: unable to createImage on display=%p slot=%d",
+                    mEglDisplay, buf);
+            releaseBufferLocked(buf, mSlots[buf].mGraphicBuffer,
+                    mEglDisplay, EGL_NO_SYNC_KHR);
+            return UNKNOWN_ERROR;
+        }
+#ifndef MTK_DEFAULT_AOSP
     }
+#endif
 
     // Do whatever sync ops we need to do before releasing the old slot.
     err = syncForReleaseLocked(mEglDisplay);
@@ -460,6 +476,12 @@ status_t GLConsumer::bindTextureImageLocked() {
         ST_LOGW("bindTextureImage: clearing GL error: %#04x", error);
     }
 
+#ifndef MTK_DEFAULT_AOSP
+    // do not bind texture if secure buffer
+    if (mCurrentTextureImage->graphicBuffer()->getUsage() & GRALLOC_USAGE_SECURE) {
+        return doGLFenceWaitLocked();
+    }
+#endif
     glBindTexture(mTexTarget, mTexName);
     if (mCurrentTexture == BufferQueue::INVALID_BUFFER_SLOT &&
             mCurrentTextureImage == NULL) {
@@ -545,7 +567,11 @@ void GLConsumer::setReleaseFence(const sp<Fence>& fence) {
 
 status_t GLConsumer::detachFromContext() {
     ATRACE_CALL();
+#ifndef MTK_DEFAULT_AOSP
+    ST_LOGI("detachFromContext");
+#else
     ST_LOGV("detachFromContext");
+#endif
     Mutex::Autolock lock(mMutex);
 
     if (mAbandoned) {
@@ -590,7 +616,11 @@ status_t GLConsumer::detachFromContext() {
 
 status_t GLConsumer::attachToContext(uint32_t tex) {
     ATRACE_CALL();
+#ifndef MTK_DEFAULT_AOSP
+    ST_LOGI("attachToContext");
+#else
     ST_LOGV("attachToContext");
+#endif
     Mutex::Autolock lock(mMutex);
 
     if (mAbandoned) {

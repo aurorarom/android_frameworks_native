@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2007 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -69,6 +74,11 @@ private:
     friend class Singleton<GraphicBufferMapper>;
     GraphicBufferMapper();
     gralloc_module_t const *mAllocMod;
+
+#ifdef MTK_AOSP_ENHANCEMENT 
+private:
+    bool mIsDumpCallStack;
+#endif
 };
 
 // ---------------------------------------------------------------------------

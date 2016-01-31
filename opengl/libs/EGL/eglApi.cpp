@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  ** Copyright 2007, The Android Open Source Project
  **
  ** Licensed under the Apache License, Version 2.0 (the "License");
@@ -790,6 +795,20 @@ EGLBoolean eglMakeCurrent(  EGLDisplay dpy, EGLSurface draw,
         // this will ALOGE the error
         egl_connection_t* const cnx = &gEGLImpl;
         result = setError(cnx->egl.eglGetError(), EGL_FALSE);
+
+        // MTK {{{{
+        if (NULL != cur_c)
+        {
+            SurfaceRef _cur_r(get_surface(cur_c->read));
+            SurfaceRef _cur_d(get_surface(cur_c->draw));
+            
+            cur_c->read = EGL_NO_SURFACE;
+            cur_c->draw = EGL_NO_SURFACE;
+
+            _cur_r.release();
+            _cur_d.release();
+        }
+        // MTK }}}}
     }
     return result;
 }

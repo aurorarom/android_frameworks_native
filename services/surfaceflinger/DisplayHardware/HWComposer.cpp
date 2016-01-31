@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2010 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -318,7 +323,11 @@ void HWComposer::vsync(int disp, int64_t timestamp) {
 
         char tag[16];
         snprintf(tag, sizeof(tag), "HW_VSYNC_%1u", disp);
+#ifdef MTK_AOSP_ENHANCEMENT
+        ATRACE_INT_PERF(tag, ++mVSyncCounts[disp] & 1);
+#else
         ATRACE_INT(tag, ++mVSyncCounts[disp] & 1);
+#endif
 
         mEventHandler.onVSyncReceived(disp, timestamp);
     }
@@ -708,6 +717,18 @@ status_t HWComposer::prepare() {
             if (hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_3)) {
                 mLists[i]->outbuf = disp.outbufHandle;
                 mLists[i]->outbufAcquireFenceFd = -1;
+#ifdef MTK_AOSP_ENHANCEMENT
+                if (mDisplayData[i].mirrorId >= 0) {
+                    mLists[i]->flags |= HWC_MIRROR_DISPLAY;
+                    mLists[i]->flags |= mDisplayData[i].mirrorId << 8;
+                }
+                mLists[i]->flags |= mDisplayData[i].orientation << 16;
+
+                if (!mustRecompose(i))
+                {
+                    mLists[i]->flags |= HWC_SKIP_DISPLAY;
+                }
+#endif
             } else if (hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_1)) {
                 // garbage data to catch improper use
                 mLists[i]->dpy = (hwc_display_t)0xDEADBEEF;
@@ -715,6 +736,14 @@ status_t HWComposer::prepare() {
             } else {
                 mLists[i]->dpy = EGL_NO_DISPLAY;
                 mLists[i]->sur = EGL_NO_SURFACE;
+#ifdef MTK_AOSP_ENHANCEMENT
+                // External Display related
+                // (only need for HWC_DEVICE_API_VERSION_1_0 or lower version)
+                if (i == 0) {
+                    sp<const DisplayDevice> hw(mFlinger->getDefaultDisplayDevice());
+                    mLists[i]->flags |= hw->getOrientation() << 16;
+                }
+#endif
             }
         }
     }
@@ -827,6 +856,10 @@ sp<Fence> HWComposer::getAndResetReleaseFence(int32_t id) {
 }
 
 status_t HWComposer::commit() {
+#ifdef MTK_AOSP_ENHANCEMENT
+    ATRACE_CALL_PERF();
+#endif
+
     int err = NO_ERROR;
     if (mHwc) {
         if (!hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_1)) {
@@ -841,8 +874,13 @@ status_t HWComposer::commit() {
             DisplayData& disp(mDisplayData[i]);
             if (disp.outbufHandle) {
                 mLists[i]->outbuf = disp.outbufHandle;
+#ifdef MTK_AOSP_ENHANCEMENT
+                mLists[i]->outbufAcquireFenceFd =
+                        mustRecompose(i) ? disp.outbufAcquireFence->dup() : -1;
+#else
                 mLists[i]->outbufAcquireFenceFd =
                         disp.outbufAcquireFence->dup();
+#endif
             }
         }
 
@@ -858,6 +896,12 @@ status_t HWComposer::commit() {
                     disp.list->retireFenceFd = -1;
                 }
                 disp.list->flags &= ~HWC_GEOMETRY_CHANGED;
+#ifdef MTK_AOSP_ENHANCEMENT
+                // clear additional flags
+                disp.list->flags &=
+                    ~(HWC_MIRROR_DISPLAY | HWC_MIRRORED_DISP_MASK |
+                      HWC_SKIP_DISPLAY | HWC_ORIENTATION_MASK);
+#endif
             }
         }
     }
@@ -945,6 +989,9 @@ int HWComposer::fbPost(int32_t id,
     if (mHwc && hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_1)) {
         return setFramebufferTarget(id, acquireFence, buffer);
     } else {
+#ifdef MTK_AOSP_ENHANCEMENT
+        ATRACE_CALL();
+#endif
         acquireFence->waitForever("HWComposer::fbPost");
         return mFbDev->post(mFbDev, buffer->handle);
     }
@@ -1160,7 +1207,12 @@ public:
     virtual void setBuffer(const sp<GraphicBuffer>& buffer) {
         if (buffer == 0 || buffer->handle == 0) {
             getLayer()->compositionType = HWC_FRAMEBUFFER;
-            getLayer()->flags |= HWC_SKIP_LAYER;
+#ifdef MTK_AOSP_ENHANCEMENT
+            // Because HWC would default skip layer with flag HWC_SKIP_LAYER
+            // as the dim layer, no set skip layer to avoid the original design
+            if (0 == (getLayer()->flags & HWC_DIM_LAYER))
+#endif
+                getLayer()->flags |= HWC_SKIP_LAYER;
             getLayer()->handle = 0;
         } else {
             if (getLayer()->compositionType == HWC_SIDEBAND) {
@@ -1183,6 +1235,15 @@ public:
 
         getLayer()->acquireFenceFd = -1;
     }
+#ifdef MTK_AOSP_ENHANCEMENT
+    virtual void setDim(bool dim) {
+        if (dim) {
+            getLayer()->flags |= HWC_DIM_LAYER;
+        } else {
+            getLayer()->flags &= ~HWC_DIM_LAYER;
+        }
+    }
+#endif
 };
 
 /*
@@ -1359,6 +1420,13 @@ void HWComposer::dump(String8& result) const {
         mHwc->dump(mHwc, buffer, SIZE);
         result.append(buffer);
     }
+
+#ifdef MTK_AOSP_ENHANCEMENT
+    // 20120814: add property function for debug purpose
+    if (mVSyncThread != NULL) {
+        mVSyncThread->setProperty();
+    }
+#endif
 }
 
 // ---------------------------------------------------------------------------

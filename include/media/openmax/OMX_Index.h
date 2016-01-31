@@ -1,3 +1,8 @@
+/*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
 /* ------------------------------------------------------------------
  * Copyright (C) 1998-2009 PacketVideo
  *
@@ -265,6 +270,11 @@ typedef enum OMX_INDEXTYPE {
     OMX_IndexMax = 0x7FFFFFFF
 
 } OMX_INDEXTYPE;
+
+//#ifndef ANDROID_DEFAULT_CODE
+#ifdef MTK_AOSP_ENHANCEMENT
+#include <OMX_IndexExt.h>
+#endif
 
 #ifdef __cplusplus
 }

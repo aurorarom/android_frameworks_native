@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2010 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -650,6 +655,7 @@ private:
 class CursorButtonAccumulator {
 public:
     CursorButtonAccumulator();
+    void configure(const InputReaderConfiguration * config);
     void reset(InputDevice* device);
 
     void process(const RawEvent* rawEvent);
@@ -657,6 +663,7 @@ public:
     uint32_t getButtonState() const;
 
 private:
+    bool mChangePrimaryKey;
     bool mBtnLeft;
     bool mBtnRight;
     bool mBtnMiddle;

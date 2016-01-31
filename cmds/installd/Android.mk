@@ -20,9 +20,15 @@ include $(BUILD_STATIC_LIBRARY)
 #
 
 include $(CLEAR_VARS)
+
 LOCAL_MODULE := installd
 LOCAL_MODULE_TAGS := optional
 LOCAL_CFLAGS := $(common_cflags)
+
+ifeq ($(strip $(MTK_OAT_ON_SDCARD_SUPPORT)), yes)
+LOCAL_CFLAGS += -DMTK_OAT_ON_SDCARD_SUPPORT
+endif
+
 LOCAL_SRC_FILES := installd.c $(common_src_files)
 LOCAL_SHARED_LIBRARIES := libcutils liblog libselinux
 LOCAL_STATIC_LIBRARIES := libdiskusage

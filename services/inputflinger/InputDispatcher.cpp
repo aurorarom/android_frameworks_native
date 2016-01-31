@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2010 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,33 +25,45 @@
 //#define LOG_NDEBUG 0
 
 // Log detailed debug messages about each inbound event notification to the dispatcher.
-#define DEBUG_INBOUND_EVENT_DETAILS 0
+#define DEBUG_INBOUND_EVENT_DETAILS 1
 
 // Log detailed debug messages about each outbound event processed by the dispatcher.
-#define DEBUG_OUTBOUND_EVENT_DETAILS 0
+#define DEBUG_OUTBOUND_EVENT_DETAILS 1
 
 // Log debug messages about the dispatch cycle.
-#define DEBUG_DISPATCH_CYCLE 0
+#define DEBUG_DISPATCH_CYCLE 1
 
 // Log debug messages about registrations.
-#define DEBUG_REGISTRATION 0
+#define DEBUG_REGISTRATION 1
 
 // Log debug messages about input event injection.
-#define DEBUG_INJECTION 0
+#define DEBUG_INJECTION 1
 
 // Log debug messages about input focus tracking.
-#define DEBUG_FOCUS 0
+#define DEBUG_FOCUS 1
 
 // Log debug messages about the app switch latency optimization.
-#define DEBUG_APP_SWITCH 0
+#define DEBUG_APP_SWITCH 1
 
 // Log debug messages about hover events.
-#define DEBUG_HOVER 0
+#define DEBUG_HOVER 1
+
+/// M: Switch log by command @{
+bool gInputLogEnabled = false;
+#undef ALOGD
+#define ALOGD(...) if (gInputLogEnabled) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+/// @}
+
+/// M: Enhance keydispatching predump @{
+#define START_MONITOR_KEYDISPATCHING_TIMEOUT_MSG  1004
+#define REMOVE_KEYDISPATCHING_TIMEOUT_MSG  1005
+/// @}
 
 #include "InputDispatcher.h"
 
 #include <utils/Trace.h>
 #include <cutils/log.h>
+#include <cutils/properties.h>
 #include <powermanager/PowerManager.h>
 #include <ui/Region.h>
 
@@ -55,6 +72,11 @@
 #include <errno.h>
 #include <limits.h>
 #include <time.h>
+
+/// M:PerfBoost include @{
+#include <dlfcn.h>
+#include "PerfServiceNative.h"
+/// @}
 
 #define INDENT "  "
 #define INDENT2 "    "
@@ -65,7 +87,10 @@ namespace android {
 
 // Default input dispatching timeout if there is no focused application or paused window
 // from which to determine an appropriate dispatching timeout.
-const nsecs_t DEFAULT_INPUT_DISPATCHING_TIMEOUT = 5000 * 1000000LL; // 5 sec
+/// M: 2012-06-22 ALPS00314133 WNR debugging mechanism @{
+//const nsecs_t DEFAULT_INPUT_DISPATCHING_TIMEOUT = 5000 * 1000000LL; // 5 sec
+const nsecs_t DEFAULT_INPUT_DISPATCHING_TIMEOUT = 8000 * 1000000LL; // 8 sec 
+/// @}
 
 // Amount of time to allow for all pending events to be processed when an app switch
 // key is on the way.  This is used to preempt input dispatch and drop input events
@@ -87,6 +112,18 @@ const nsecs_t SLOW_EVENT_PROCESSING_WARNING_TIMEOUT = 2000 * 1000000LL; // 2sec
 
 // Number of recent events to keep for debugging purposes.
 const size_t RECENT_QUEUE_MAX_SIZE = 10;
+
+/// M:PerfBoost define @{
+int (*perfBoostEnable)(int) = NULL;
+int (*perfBoostDisable)(int) = NULL;
+void (*perfBoostEnableTimeout)(int, int) = NULL;
+
+typedef int (*ena)(int);
+typedef int (*disa)(int);
+typedef void (*ena_timeout)(int, int);
+
+#define LIB_FULL_NAME "libperfservicenative.so"
+/// @}
 
 static inline nsecs_t now() {
     return systemTime(SYSTEM_TIME_MONOTONIC);
@@ -201,12 +238,40 @@ InputDispatcher::InputDispatcher(const sp<InputDispatcherPolicyInterface>& polic
     mPendingEvent(NULL), mAppSwitchSawKeyDown(false), mAppSwitchDueTime(LONG_LONG_MAX),
     mNextUnblockedEvent(NULL),
     mDispatchEnabled(false), mDispatchFrozen(false), mInputFilterEnabled(false),
-    mInputTargetWaitCause(INPUT_TARGET_WAIT_CAUSE_NONE) {
+    /// M: Enhance keydispatching predump
+    mInputTargetWaitCause(INPUT_TARGET_WAIT_CAUSE_NONE), mIsPredumping(false) {
+    
+    /// M:PerfBoost init @{
+    void *handle, *func;
+    /// @}
+    
     mLooper = new Looper(false);
 
     mKeyRepeatState.lastKeyEntry = NULL;
 
     policy->getDispatcherConfiguration(&mConfig);
+
+    /// M:PerfBoost init @{
+    handle = dlopen(LIB_FULL_NAME, RTLD_NOW);
+
+	func = dlsym(handle, "PerfServiceNative_boostEnableAsync");
+	perfBoostEnable = reinterpret_cast<ena>(func);
+	if (perfBoostEnable == NULL) {
+		ALOGE("PerfServiceNative_boostEnableAsync init fail!");
+	}
+
+	func = dlsym(handle, "PerfServiceNative_boostDisableAsync");
+	perfBoostDisable = reinterpret_cast<disa>(func);
+	if (perfBoostDisable == NULL) {
+		ALOGE("PerfServiceNative_boostDisableAsync init fail!");
+	}
+
+	func = dlsym(handle, "PerfServiceNative_boostEnableTimeoutAsync");
+	perfBoostEnableTimeout = reinterpret_cast<ena_timeout>(func);
+	if (perfBoostEnableTimeout == NULL) {
+		ALOGE("PerfServiceNative_boostEnableTimeoutAsync init fail!");
+	}
+    /// @}
 }
 
 InputDispatcher::~InputDispatcher() {
@@ -866,6 +931,34 @@ bool InputDispatcher::dispatchMotionLocked(
                 "conflicting pointer actions");
         synthesizeCancelationEventsForAllConnectionsLocked(options);
     }
+
+
+    /// M:PerfBoost enable/disable @{
+    switch (entry->action) {
+        case AMOTION_EVENT_ACTION_DOWN: {
+#if !defined(MTK_TOUCH_BOOST)
+            if (perfBoostEnable)
+                perfBoostEnable(SCN_APP_TOUCH);
+#else
+            if (perfBoostEnable)
+                perfBoostEnable(SCN_APP_TOUCH);
+#endif
+            break;
+        }
+        case AMOTION_EVENT_ACTION_UP:
+        case AMOTION_EVENT_ACTION_CANCEL: {
+#if !defined(MTK_TOUCH_BOOST)
+            if (perfBoostDisable)
+                perfBoostDisable(SCN_APP_TOUCH);
+#else
+            if (perfBoostEnableTimeout)
+                perfBoostEnableTimeout(SCN_APP_TOUCH, 3);
+#endif
+            break;
+        }
+    }
+    /// @}
+
     dispatchEventLocked(currentTime, entry, inputTargets);
     return true;
 }
@@ -976,6 +1069,29 @@ int32_t InputDispatcher::handleTargetsNotReadyLocked(nsecs_t currentTime,
             if (mInputTargetWaitApplicationHandle == NULL && applicationHandle != NULL) {
                 mInputTargetWaitApplicationHandle = applicationHandle;
             }
+#ifndef MTK_EMULATOR_SUPPORT
+            /// M: Enhance keydispatching predump @{
+            if (windowHandle != NULL) {
+                const InputWindowInfo* windowInfo = windowHandle->getInfo();
+                if (windowInfo != NULL) {
+                    mFocusedWindow = windowHandle;
+                    if (windowInfo->ownerPid > 0) {
+                        mPolicy->notifyPredump(applicationHandle, mFocusedWindow, windowInfo->ownerPid, START_MONITOR_KEYDISPATCHING_TIMEOUT_MSG);
+                        mIsPredumping = true;
+                    }
+                }
+            } else {
+                if (mFocusedApplicationHandle != NULL) {
+                    if (mFocusedApplicationHandle->getInfo() != NULL) {
+                        if (mFocusedApplicationHandle->getInfo()->pid > 0) {
+                            mPolicy->notifyPredump(applicationHandle, mFocusedWindow, mFocusedApplicationHandle->getInfo()->pid, START_MONITOR_KEYDISPATCHING_TIMEOUT_MSG);
+                            mIsPredumping = true;
+                        }
+                    }
+                }
+            }
+            /// @}
+#endif
         }
     }
 
@@ -1053,6 +1169,21 @@ void InputDispatcher::resetANRTimeoutsLocked() {
     // Reset input target wait timeout.
     mInputTargetWaitCause = INPUT_TARGET_WAIT_CAUSE_NONE;
     mInputTargetWaitApplicationHandle.clear();
+#ifndef MTK_EMULATOR_SUPPORT
+    /// M: Enhance keydispatching predump @{
+    if (mFocusedWindow != NULL) {
+        if (mFocusedWindow->getInfo() != NULL) {
+            mPolicy->notifyPredump(mFocusedApplicationHandle, mFocusedWindow, mFocusedWindow->getInfo()->ownerPid, REMOVE_KEYDISPATCHING_TIMEOUT_MSG);
+            mIsPredumping = false;
+        }
+    } else if (mFocusedApplicationHandle != NULL) {
+        if (mFocusedApplicationHandle->getInfo() != NULL) {
+            mPolicy->notifyPredump(mFocusedApplicationHandle, mFocusedWindow, mFocusedApplicationHandle->getInfo()->pid, REMOVE_KEYDISPATCHING_TIMEOUT_MSG);
+            mIsPredumping = false;
+        }
+    }
+    /// @}
+#endif
 }
 
 int32_t InputDispatcher::findFocusedWindowTargetsLocked(nsecs_t currentTime,
@@ -2453,6 +2584,16 @@ void InputDispatcher::notifyMotion(const NotifyMotionArgs* args) {
                 args->pointerCoords[i].getAxisValue(AMOTION_EVENT_AXIS_TOOL_MAJOR),
                 args->pointerCoords[i].getAxisValue(AMOTION_EVENT_AXIS_TOOL_MINOR),
                 args->pointerCoords[i].getAxisValue(AMOTION_EVENT_AXIS_ORIENTATION));
+        /// M: input systrace  @{
+        if (ATRACE_ENABLED()) {
+            char buffer[50];
+            snprintf(buffer, sizeof(buffer), "notify_x : %d, notify_y : %d", 
+                (int)args->pointerCoords[i].getAxisValue(AMOTION_EVENT_AXIS_X),
+                (int)args->pointerCoords[i].getAxisValue(AMOTION_EVENT_AXIS_Y));
+            ATRACE_BEGIN(buffer);
+            ATRACE_END();
+        }
+        /// @}
     }
 #endif
     if (!validateMotionEvent(args->action, args->pointerCount, args->pointerProperties)) {
@@ -3771,6 +3912,19 @@ void InputDispatcher::traceWaitQueueLengthLocked(const sp<Connection>& connectio
 void InputDispatcher::dump(String8& dump) {
     AutoMutex _l(mLock);
 
+    /// M: Switch log by command @{
+    char buf[PROPERTY_VALUE_MAX];
+    property_get("sys.inputlog.enabled", buf, "false");
+    if (!strcmp(buf, "true")) {
+        gInputLogEnabled = true;
+        InputChannel::switchInputLog(gInputLogEnabled);
+        ALOGD("Input log is enabled");
+    } else if (!strcmp(buf, "false")) {
+        ALOGD("Input log is disabled");
+        gInputLogEnabled = false;
+        InputChannel::switchInputLog(gInputLogEnabled);
+    }
+    /// @}
     dump.append("Input Dispatcher State:\n");
     dumpDispatchStateLocked(dump);
 

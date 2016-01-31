@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2007 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -101,6 +106,11 @@
 #define DEBUG_SCREENSHOTS   false
 
 EGLAPI const char* eglQueryStringImplementationANDROID(EGLDisplay dpy, EGLint name);
+
+#ifdef MTK_AOSP_ENHANCEMENT
+// additional mtk utils
+#include "mediatek/SurfaceFlingerWatchDog.h"
+#endif
 
 namespace android {
 
@@ -216,6 +226,11 @@ void SurfaceFlinger::onFirstRef()
 
 SurfaceFlinger::~SurfaceFlinger()
 {
+#ifdef MTK_AOSP_ENHANCEMENT
+    // 20121003: mHwc should be deleted to avoid memory leak
+    delete mHwc;
+#endif
+
     EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
     eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
     eglTerminate(display);
@@ -332,6 +347,13 @@ void SurfaceFlinger::bootFinished()
     // formerly we would just kill the process, but we now ask it to exit so it
     // can choose where to stop the animation.
     property_set("service.bootanim.exit", "1");
+
+#ifdef MTK_AOSP_ENHANCEMENT
+    // boot time profiling
+    ALOG(LOG_INFO,"boot","BOOTPROF:BootAnimation:End:%ld", long(ns2ms(systemTime())));
+    bootProf(0);
+    SFWatchDog::getInstance()->setThreshold(500);
+#endif
 }
 
 void SurfaceFlinger::deleteTextureAsync(uint32_t texture) {
@@ -399,7 +421,11 @@ private:
 
             if (mTraceVsync) {
                 mValue = (mValue + 1) % 2;
+#ifdef MTK_AOSP_ENHANCEMENT
+                ATRACE_INT_PERF(mVsyncEventLabel.string(), mValue);
+#else
                 ATRACE_INT(mVsyncEventLabel.string(), mValue);
+#endif
             }
         }
 
@@ -448,8 +474,22 @@ void SurfaceFlinger::init() {
     // retrieve the EGL context that was selected/created
     mEGLContext = mRenderEngine->getEGLContext();
 
+#ifdef MTK_AOSP_ENHANCEMENT
+    // make sure 3D init success
+    if (mEGLContext == EGL_NO_CONTEXT)
+    {
+        ALOGE("FATAL: couldn't create EGLContext");
+        delete mHwc;
+        eglTerminate(mEGLDisplay);
+        exit(0);
+    }
+
+    // init properties setting first
+    setMTKProperties();
+#else
     LOG_ALWAYS_FATAL_IF(mEGLContext == EGL_NO_CONTEXT,
             "couldn't create EGLContext");
+#endif
 
     // initialize our non-virtual displays
     for (size_t i=0 ; i<DisplayDevice::NUM_BUILTIN_DISPLAY_TYPES ; i++) {
@@ -493,12 +533,39 @@ void SurfaceFlinger::init() {
     // (which may happens before we render something)
     getDefaultDisplayDevice()->makeCurrent(mEGLDisplay, mEGLContext);
 
+#ifdef MTK_AOSP_ENHANCEMENT
+    mWatchDogIndex = SFWatchDog::getInstance()->registerNodeName("SurfaceFlinger");
+    sPropertiesState.mAppVSyncOffset = VSYNC_EVENT_PHASE_OFFSET_NS;
+    sPropertiesState.mSfVSyncOffset = SF_VSYNC_EVENT_PHASE_OFFSET_NS;
+
+    char vsyncOffsetProp[PROPERTY_VALUE_MAX];
+    if (property_get("debug.sf.appvsync", vsyncOffsetProp, NULL) > 0) {
+        sPropertiesState.mAppVSyncOffset = atoi(vsyncOffsetProp);
+    }
+    if (property_get("debug.sf.sfvsync", vsyncOffsetProp, NULL) > 0) {
+        sPropertiesState.mSfVSyncOffset = atoi(vsyncOffsetProp);
+    }
+
+#ifndef MTK_EMULATOR_SUPPORT
+    sp<Resync> resync = new Resync(this, HWC_DISPLAY_PRIMARY);
+    mPrimaryDispSync.setResync(resync);
+#endif
+
+    // start the EventThread
+    sp<VSyncSource> vsyncSrc = new DispSyncSource(&mPrimaryDispSync,
+            sPropertiesState.mAppVSyncOffset, true, "app");
+    mEventThread = new EventThread(vsyncSrc);
+    sp<VSyncSource> sfVsyncSrc = new DispSyncSource(&mPrimaryDispSync,
+            sPropertiesState.mSfVSyncOffset, true, "sf");
+#else
+
     // start the EventThread
     sp<VSyncSource> vsyncSrc = new DispSyncSource(&mPrimaryDispSync,
             vsyncPhaseOffsetNs, true, "app");
     mEventThread = new EventThread(vsyncSrc);
     sp<VSyncSource> sfVsyncSrc = new DispSyncSource(&mPrimaryDispSync,
             sfVsyncPhaseOffsetNs, true, "sf");
+#endif
     mSFEventThread = new EventThread(sfVsyncSrc);
     mEventQueue.setEventThread(mSFEventThread);
 
@@ -571,6 +638,11 @@ status_t SurfaceFlinger::getDisplayConfigs(const sp<IBinder>& display,
         return type;
     }
 
+#ifdef MTK_AOSP_ENHANCEMENT
+    // TODO: should it be placed at a better place
+    const HWComposer& hwc(getHwComposer());
+#endif // MTK_AOSP_ENHANCEMENT
+
     // TODO: Not sure if display density should handled by SF any longer
     class Density {
         static int getDensityFromProperty(char const* propName) {
@@ -618,6 +690,12 @@ status_t SurfaceFlinger::getDisplayConfigs(const sp<IBinder>& display,
             // TODO: this needs to go away (currently needed only by webkit)
             sp<const DisplayDevice> hw(getDefaultDisplayDevice());
             info.orientation = hw->getOrientation();
+#ifdef MTK_AOSP_ENHANCEMENT
+        } else if (HWC_DISPLAY_SMARTBOOK == hwc.getSubType(type)) {
+            static const int SMB_DENSITY = 160;
+            info.density = SMB_DENSITY / 160.0f;
+            info.orientation = 0;
+#endif
         } else {
             // TODO: where should this value come from?
             static const int TV_DENSITY = 213;
@@ -679,6 +757,9 @@ status_t SurfaceFlinger::getDisplayStats(const sp<IBinder>& display,
     memset(stats, 0, sizeof(*stats));
     stats->vsyncTime   = mPrimaryDispSync.computeNextRefresh(0);
     stats->vsyncPeriod = mPrimaryDispSync.getPeriod();
+#ifdef MTK_AOSP_ENHANCEMENT
+    stats->vsyncSFTime = stats->vsyncTime + sfVsyncPhaseOffsetNs;
+#endif
     return NO_ERROR;
 }
 
@@ -1129,12 +1210,47 @@ void SurfaceFlinger::rebuildLayerStacks() {
             hw->undefinedRegion.set(bounds);
             hw->undefinedRegion.subtractSelf(tr.transform(opaqueRegion));
             hw->dirtyRegion.orSelf(dirtyRegion);
+#ifdef MTK_AOSP_ENHANCEMENT
+            if (CC_UNLIKELY(
+                    (hw->getPageFlipCount() < 1) &&
+                    (hw->getDisplayType() == DisplayDevice::DISPLAY_PRIMARY))) {
+                hw->dirtyRegion.clear();
+            }
+#endif
         }
     }
 }
 
 void SurfaceFlinger::setUpHWComposer() {
+#ifdef MTK_AOSP_ENHANCEMENT
+    // handle primary display first
+    {
+        sp<DisplayDevice>& hw = mDisplays.editValueFor(mBuiltinDisplays[DisplayDevice::DISPLAY_PRIMARY]);
+        bool dirty = !hw->getDirtyRegion(false).isEmpty();
+        bool empty = hw->getVisibleLayersSortedByZ().size() == 0;
+        bool wasEmpty = !hw->lastCompositionHadVisibleLayers;
+
+        bool mustRecompose = dirty && !(empty && wasEmpty);
+
+        hw->setMustRecompose(mustRecompose);
+        hw->beginFrame(mustRecompose);
+        if (mustRecompose) {
+            hw->lastCompositionHadVisibleLayers = !empty;
+        }
+
+        char tag[16];
+        snprintf(tag, sizeof(tag), "SF_COMP_%d", hw->getHwcDisplayId());
+        ATRACE_INT(tag, mustRecompose ? 1 : 0);
+    }
+#endif
+
     for (size_t dpy=0 ; dpy<mDisplays.size() ; dpy++) {
+#ifdef MTK_AOSP_ENHANCEMENT
+        // skip primary display here
+        if (mDisplays[dpy]->getDisplayType() == DisplayDevice::DISPLAY_PRIMARY) {
+            continue;
+        }
+#endif
         bool dirty = !mDisplays[dpy]->getDirtyRegion(false).isEmpty();
         bool empty = mDisplays[dpy]->getVisibleLayersSortedByZ().size() == 0;
         bool wasEmpty = !mDisplays[dpy]->lastCompositionHadVisibleLayers;
@@ -1149,21 +1265,102 @@ void SurfaceFlinger::setUpHWComposer() {
         //   emit any black frames until a layer is added to the layer stack.
         bool mustRecompose = dirty && !(empty && wasEmpty);
 
+#ifdef MTK_AOSP_ENHANCEMENT
+        bool hwMustRecompose = mustRecompose;
+
+        if (!mustRecompose)
+        {
+            // adjust external/virtual display's recomposition logic (used by mirror display)
+            sp<DisplayDevice>& hw = mDisplays.editValueFor(mBuiltinDisplays[DisplayDevice::DISPLAY_PRIMARY]);
+            if (hw->mustRecompose() && mDisplays[dpy]->getHwcMirrorId() >= 0)
+            {
+                hwMustRecompose = true;
+            }
+
+            // to keep VDS's state machine happy, we need to recompose when dirty
+            if (dirty)
+            {
+                hwMustRecompose = true;
+            }
+        }
+
+        mDisplays[dpy]->setMustRecompose(hwMustRecompose);
+
+        if (mDisplays[dpy]->getDisplayType() == DisplayDevice::DISPLAY_VIRTUAL)
+        {
+            char __trace[256];
+            snprintf(__trace, sizeof(__trace), "dpy[%zu]: %s composition (%sdirty %sempty %swasEmpty)", dpy,
+                mustRecompose ? "doing" : "skipping",
+                dirty ? "+" : "-",
+                empty ? "+" : "-",
+                wasEmpty ? "+" : "-");
+
+            ATRACE_NAME(__trace);
+        }
+#else
         ALOGV_IF(mDisplays[dpy]->getDisplayType() == DisplayDevice::DISPLAY_VIRTUAL,
                 "dpy[%zu]: %s composition (%sdirty %sempty %swasEmpty)", dpy,
                 mustRecompose ? "doing" : "skipping",
                 dirty ? "+" : "-",
                 empty ? "+" : "-",
                 wasEmpty ? "+" : "-");
+#endif
 
         mDisplays[dpy]->beginFrame(mustRecompose);
 
         if (mustRecompose) {
             mDisplays[dpy]->lastCompositionHadVisibleLayers = !empty;
         }
+
+#ifdef MTK_AOSP_ENHANCEMENT
+        char tag[16];
+        snprintf(tag, sizeof(tag), "SF_COMP_%d", mDisplays[dpy]->getHwcDisplayId());
+        ATRACE_INT(tag, mustRecompose ? 1 : 0);
+
+        // adjust primary display's recomposition logic (used by mirror display)
+        if (mDisplays[dpy]->mustRecompose() && mDisplays[dpy]->getHwcMirrorId() >= 0)
+        {
+            sp<DisplayDevice>& hw = mDisplays.editValueFor(mBuiltinDisplays[DisplayDevice::DISPLAY_PRIMARY]);
+            hw->setMustRecompose(true);
+            hw->beginFrame(true);
+            hw->lastCompositionHadVisibleLayers = !(hw->getVisibleLayersSortedByZ().size() == 0);
+
+            char tag[16];
+            snprintf(tag, sizeof(tag), "SF_COMP_%d", hw->getHwcDisplayId());
+            ATRACE_INT(tag, 1);
+        }
+#endif
     }
 
     HWComposer& hwc(getHwComposer());
+
+#ifdef MTK_AOSP_ENHANCEMENT
+    if (CC_LIKELY(!sPropertiesState.mDebugSkipComp))
+    {
+        bool mustRecompose = false;
+        // check if any display need to recompose
+        for (size_t dpy=0 ; dpy<mDisplays.size() ; dpy++) {
+            sp<const DisplayDevice> hw(mDisplays[dpy]);
+            if (hw->mustRecompose()) {
+                mustRecompose = true;
+                break;
+            }
+        }
+
+        // do not create work list if nothing has changed
+        if (!mustRecompose) {
+            mMustRecompose = false;
+            return;
+        }
+
+        mMustRecompose = true;
+    }
+    else
+    {
+        mMustRecompose = true;
+    }
+#endif
+
     if (hwc.initCheck() == NO_ERROR) {
         // build the h/w work list
         if (CC_UNLIKELY(mHwWorkListDirty)) {
@@ -1181,7 +1378,12 @@ void SurfaceFlinger::setUpHWComposer() {
                         for (size_t i=0 ; cur!=end && i<count ; ++i, ++cur) {
                             const sp<Layer>& layer(currentLayers[i]);
                             layer->setGeometry(hw, *cur);
+#ifdef MTK_AOSP_ENHANCEMENT
+                            if (!hw->mustRecompose() ||
+                                mDebugDisableHWC || mDebugRegion || mDaltonize || mHasColorMatrix) {
+#else
                             if (mDebugDisableHWC || mDebugRegion || mDaltonize || mHasColorMatrix) {
+#endif
                                 cur->setSkip(true);
                             }
                         }
@@ -1263,6 +1465,13 @@ void SurfaceFlinger::setUpHWComposer() {
             sp<const DisplayDevice> hw(mDisplays[dpy]);
             const int32_t id = hw->getHwcDisplayId();
             if (id >= 0) {
+#ifdef MTK_AOSP_ENHANCEMENT
+                // fill mirror information
+                hwc.setDisplayMirrorId(id, hw->getHwcMirrorId());
+                hwc.setDisplayOrientation(id, hw->getOrientationTransform());
+
+                if (!hw->mustRecompose()) continue;
+#endif
                 const Vector< sp<Layer> >& currentLayers(
                     hw->getVisibleLayersSortedByZ());
                 const size_t count = currentLayers.size();
@@ -1283,20 +1492,45 @@ void SurfaceFlinger::setUpHWComposer() {
 
         for (size_t dpy=0 ; dpy<mDisplays.size() ; dpy++) {
             sp<const DisplayDevice> hw(mDisplays[dpy]);
+#ifdef MTK_AOSP_ENHANCEMENT
+            if (!hw->mustRecompose()) {
+                char tag[32];
+                snprintf(tag, sizeof(tag), "skipComposition_%d", hw->getHwcDisplayId());
+                ATRACE_NAME(tag);
+                continue;
+            }
+#endif
             hw->prepareFrame(hwc);
         }
     }
 }
 
 void SurfaceFlinger::doComposition() {
+#ifdef MTK_AOSP_ENHANCEMENT
+    // to slow down FPS
+    if (CC_UNLIKELY(0 != sPropertiesState.mDelayTime)) {
+        ALOGI("SurfaceFlinger slow motion timer: %d ms",
+              sPropertiesState.mDelayTime);
+        usleep(1000 * sPropertiesState.mDelayTime);
+    }
+#endif
+
     ATRACE_CALL();
     const bool repaintEverything = android_atomic_and(0, &mRepaintEverything);
     for (size_t dpy=0 ; dpy<mDisplays.size() ; dpy++) {
         const sp<DisplayDevice>& hw(mDisplays[dpy]);
+#ifdef MTK_AOSP_ENHANCEMENT
+        if (!hw->mustRecompose()) continue;
+#endif
         if (hw->isDisplayOn()) {
             // transform the dirty region into this screen's coordinate space
             const Region dirtyRegion(hw->getDirtyRegion(repaintEverything));
 
+#ifdef MTK_AOSP_ENHANCEMENT
+            char tag[32];
+            snprintf(tag, sizeof(tag), "doDisplayComposition_%d", hw->getHwcDisplayId());
+            ATRACE_NAME(tag);
+#endif
             // repaint the framebuffer (if needed)
             doDisplayComposition(hw, dirtyRegion);
 
@@ -1338,6 +1572,9 @@ void SurfaceFlinger::postFramebuffer()
 
     for (size_t dpy=0 ; dpy<mDisplays.size() ; dpy++) {
         sp<const DisplayDevice> hw(mDisplays[dpy]);
+#ifdef MTK_AOSP_ENHANCEMENT
+        if (!hw->mustRecompose()) continue;
+#endif
         const Vector< sp<Layer> >& currentLayers(hw->getVisibleLayersSortedByZ());
         hw->onSwapBuffersCompleted(hwc);
         const size_t count = currentLayers.size();
@@ -1578,6 +1815,9 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                     if (disp != NULL) {
                         if (state.layerStack != draw[i].layerStack) {
                             disp->setLayerStack(state.layerStack);
+#ifdef MTK_AOSP_ENHANCEMENT
+                            scanMirrorDisplay();
+#endif
                         }
                         if ((state.orientation != draw[i].orientation)
                                 || (state.viewport != draw[i].viewport)
@@ -2101,6 +2341,14 @@ void SurfaceFlinger::doDisplayComposition(const sp<const DisplayDevice>& hw,
         return;
     }
 
+#ifdef MTK_AOSP_ENHANCEMENT
+    // doDisplayComposition debug msg
+    if (CC_UNLIKELY(sPropertiesState.mLogRepaint)) {
+        ALOGD("[doDisplayComposition] (type:%d hwcid:%d name:%s) +",
+            hw->getDisplayType(), hw->getHwcDisplayId(), hw->getDisplayName().string());
+    }
+#endif
+
     Region dirtyRegion(inDirtyRegion);
 
     // compute the invalid region
@@ -2369,6 +2617,14 @@ bool SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
                     tr.transform(layer->visibleRegion)));
             if (!clip.isEmpty()) {
                 layer->draw(hw, clip);
+#ifdef MTK_AOSP_ENHANCEMENT
+                // debug log
+                if (CC_UNLIKELY(sPropertiesState.mLogRepaint)) {
+                    String8 str;
+                    clip.dump(str, "");
+                    ALOGD("gles (%s\n%s)", layer->getName().string(), str.string());
+                }
+#endif
             }
         }
     }
@@ -2834,12 +3090,42 @@ void SurfaceFlinger::initializeDisplays() {
     postMessageAsync(msg);  // we may be called from main thread, use async message
 }
 
+#ifdef MTK_AOSP_ENHANCEMENT
+// AED Exported Functions
+static int aeeWDTKick(int value)
+{
+    int ret = 0;
+#if 0
+    int fd = open(AE_WDT_POWERKEY_DEVICE_PATH, O_RDONLY);
+    if (fd < 0) {
+        ALOGD("Failed to open %s !!", AE_WDT_DEVICE_PATH);
+        return 1;
+    } else {
+        //ALOGD("SurfaceFlinger:AEEIOCTL_WDT_Kick setIOCTL,value=%x",value);
+        if (ioctl(fd, AEEIOCTL_WDT_KICK_POWERKEY, (int)value) != 0) {
+            ALOGD("Failed call AEEIOCTL_WDT_KICK_POWERKEY !!");
+            close(fd);
+            return 1;
+        }
+    }
+    close(fd);
+#endif
+    return ret;
+}
+#endif
+
 void SurfaceFlinger::setPowerModeInternal(const sp<DisplayDevice>& hw,
         int mode) {
     ALOGD("Set power mode=%d, type=%d flinger=%p", mode, hw->getDisplayType(),
             this);
     int32_t type = hw->getDisplayType();
     int currentMode = hw->getPowerMode();
+
+#ifdef MTK_AOSP_ENHANCEMENT
+    // tracking screen blank/unblank
+    ATRACE_CALL();
+    aeeWDTKick(WDT_SETBY_SF);
+#endif
 
     if (mode == currentMode) {
         ALOGD("Screen type=%d is already mode=%d", hw->getDisplayType(), mode);
@@ -2854,21 +3140,64 @@ void SurfaceFlinger::setPowerModeInternal(const sp<DisplayDevice>& hw,
 
     if (currentMode == HWC_POWER_MODE_OFF) {
         getHwComposer().setPowerMode(type, mode);
+
+#ifdef MTK_AOSP_ENHANCEMENT
+        const HWComposer& hwc(getHwComposer());
+        if (HWC_DISPLAY_SMARTBOOK == hwc.getSubType(DisplayDevice::DISPLAY_EXTERNAL)) {
+            if (type == DisplayDevice::DISPLAY_PRIMARY || type == DisplayDevice::DISPLAY_EXTERNAL) {
+                mEventThread->onScreenAcquired();
+                resyncToHardwareVsync(true);
+                SFWatchDog::getInstance()->screenAcquired();
+            }
+        } else if (type == DisplayDevice::DISPLAY_PRIMARY) {
+            mEventThread->onScreenAcquired();
+            resyncToHardwareVsync(true);
+            SFWatchDog::getInstance()->screenAcquired();
+        }
+#else
         if (type == DisplayDevice::DISPLAY_PRIMARY) {
             // FIXME: eventthread only knows about the main display right now
             mEventThread->onScreenAcquired();
             resyncToHardwareVsync(true);
         }
+#endif
 
         mVisibleRegionsDirty = true;
+#ifdef MTK_AOSP_ENHANCEMENT
+        // do not refresh screen when acquired while booting
+        if (true == mBootFinished) {
+            repaintEverything();
+        }
+#else
         repaintEverything();
+#endif
     } else if (mode == HWC_POWER_MODE_OFF) {
+#ifdef MTK_AOSP_ENHANCEMENT
+        const HWComposer& hwc(getHwComposer());
+        if (HWC_DISPLAY_SMARTBOOK == hwc.getSubType(DisplayDevice::DISPLAY_EXTERNAL)) {
+            if (type == DisplayDevice::DISPLAY_PRIMARY || type == DisplayDevice::DISPLAY_EXTERNAL) {
+                // release screen when all phyical displays are released
+                wp<IBinder> token = mBuiltinDisplays[type ^ 1];
+                const sp<DisplayDevice> hw2(getDisplayDevice(token));
+                if (!hw2.get() || hw2->getPowerMode() == HWC_POWER_MODE_OFF) {
+                    SFWatchDog::getInstance()->screenReleased();
+                    disableHardwareVsync(true); // also cancels any in-progress resync
+                    mEventThread->onScreenReleased();
+                }
+            }
+        } else if (type == DisplayDevice::DISPLAY_PRIMARY) {
+            disableHardwareVsync(true); // also cancels any in-progress resync
+
+            // FIXME: eventthread only knows about the main display right now
+            mEventThread->onScreenReleased();        }
+#else
         if (type == DisplayDevice::DISPLAY_PRIMARY) {
             disableHardwareVsync(true); // also cancels any in-progress resync
 
             // FIXME: eventthread only knows about the main display right now
             mEventThread->onScreenReleased();
         }
+#endif
 
         getHwComposer().setPowerMode(type, mode);
         mVisibleRegionsDirty = true;
@@ -2903,6 +3232,13 @@ void SurfaceFlinger::setPowerMode(const sp<IBinder>& display, int mode) {
     };
     sp<MessageBase> msg = new MessageSetPowerMode(*this, display, mode);
     postMessageSync(msg);
+#ifdef MTK_AOSP_ENHANCEMENT
+    // notify IPO for black screen sync issue
+    if (mode != HWC_POWER_MODE_OFF) {
+        usleep(16667);
+        property_set("sys.ipowin.done", "1");
+    }
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -2961,10 +3297,36 @@ status_t SurfaceFlinger::dump(int fd, const Vector<String16>& args)
                 mPrimaryDispSync.dump(result);
                 dumpAll = false;
             }
+#ifdef MTK_AOSP_ENHANCEMENT
+            if ((index < numArgs) &&
+                    (args[index] == String16("--mtk"))) {
+                index++;
+                clearStatsLocked(args, index, result);
+                // for run-time enable property
+                setMTKProperties(result);
+                dumpAll = false;
+            }
+#endif
         }
 
         if (dumpAll) {
+#ifdef MTK_AOSP_ENHANCEMENT
+            retry = 3;
+            while (mDumpLock.tryLock()<0 && --retry>=0) {
+                usleep(1000000);
+            }
+            const bool dumpLocked(retry >= 0);
+            if (!dumpLocked) {
+                result.append(
+                        "SurfaceFlinger appears to be unresponsive, "
+                        "failed to dump\n");
+            } else {
+                dumpAllLocked(args, index, result);
+                mDumpLock.unlock();
+            }
+#else
             dumpAllLocked(args, index, result);
+#endif
         }
 
         if (locked) {
@@ -3504,6 +3866,9 @@ public:
 
     // Binder thread
     status_t waitForResponse() {
+#ifdef MTK_AOSP_ENHANCEMENT
+        ATRACE_CALL_PERF();
+#endif
         do {
             looper->pollOnce(-1);
         } while (!exitRequested);
@@ -3667,6 +4032,11 @@ void SurfaceFlinger::renderScreenImplLocked(
         sourceCrop.setLeftTop(Point(0, 0));
         sourceCrop.setRightBottom(Point(hw_w, hw_h));
     }
+#ifdef MTK_AOSP_ENHANCEMENT
+    else {
+        hw->correctCropByHwOrientation(sourceCrop);
+    }
+#endif
 
     // ensure that sourceCrop is inside screen
     if (sourceCrop.left < 0) {
@@ -3732,6 +4102,20 @@ void SurfaceFlinger::renderScreenImplLocked(
         }
     }
 
+#ifdef MTK_AOSP_ENHANCEMENT
+    // log info of screenshot making of
+    if (CC_UNLIKELY(sPropertiesState.mDumpScreenShot > 0)) {
+        String8 s;
+        for (size_t i = 0; i < count; i++) {
+            const sp<Layer>& layer(layers[i]);
+            const Layer::State& state(layer->getDrawingState());
+            s.appendFormat("    * name=%s, layerStack=%d, z=%d, visible=%d, flags=%x, alpha=%x\n",
+                    layer->getName().string(), state.layerStack, state.z, layer->isVisible(), state.flags, state.alpha);
+        }
+        ALOGI("[renderScreenImplLocked] count=%d, minLayerZ=%u, maxLayerZ=%u +\n%s[renderScreenImplLocked] -",
+                sPropertiesState.mDumpScreenShot, minLayerZ, maxLayerZ, s.string());
+    }
+#endif
     // compositionComplete is needed for older driver
     hw->compositionComplete();
     hw->setViewportAndProjection();
@@ -3748,9 +4132,17 @@ status_t SurfaceFlinger::captureScreenImplLocked(
 {
     ATRACE_CALL();
 
+
+#ifdef MTK_AOSP_ENHANCEMENT
+    // get screen geometry
+    uint32_t hw_w = hw->getWidth();
+    uint32_t hw_h = hw->getHeight();
+    hw->correctSizeByHwOrientation(hw_w, hw_h);
+#else
     // get screen geometry
     const uint32_t hw_w = hw->getWidth();
     const uint32_t hw_h = hw->getHeight();
+#endif
 
     if ((reqWidth > hw_w) || (reqHeight > hw_h)) {
         ALOGE("size mismatch (%d, %d) > (%d, %d)",

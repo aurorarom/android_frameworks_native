@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2010 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -193,6 +198,9 @@ public:
         virtual void setAcquireFenceFd(int fenceFd) = 0;
         virtual void setPlaneAlpha(uint8_t alpha) = 0;
         virtual void onDisplayed() = 0;
+#ifdef MTK_AOSP_ENHANCEMENT
+        virtual void setDim(bool dim) = 0;
+#endif
     };
 
     /*
@@ -320,6 +328,10 @@ public:
     public:
         VSyncThread(HWComposer& hwc);
         void setEnabled(bool enabled);
+#ifdef MTK_AOSP_ENHANCEMENT
+        // 20120814: add property function for debug purpose
+        void setProperty();
+#endif
     };
 
     friend class VSyncThread;
@@ -374,6 +386,11 @@ private:
 
         // protected by mEventControlLock
         int32_t events;
+#ifdef MTK_AOSP_ENHANCEMENT
+        uint8_t subtype;
+        int32_t mirrorId;
+        uint32_t orientation;
+#endif
     };
 
     sp<SurfaceFlinger>              mFlinger;

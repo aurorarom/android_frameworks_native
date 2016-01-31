@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2005 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -533,7 +538,7 @@ bool Parcel::enforceInterface(const String16& interface,
     if (str == interface) {
         return true;
     } else {
-        ALOGW("**** enforceInterface() expected '%s' but read '%s'",
+        ALOGW("**** enforceInterface() expected '%s' but read '%s'\n",
                 String8(interface).string(), String8(str).string());
         return false;
     }
@@ -647,6 +652,9 @@ status_t Parcel::writeInt32(int32_t val)
 }
 status_t Parcel::writeInt32Array(size_t len, const int32_t *val) {
     if (!val) {
+#ifdef _MTK_ENG_BUILD_
+		ALOGD("%p writeInt32Array: val=NULL, write -1 to parcel\n", this);
+#endif
         return writeAligned(-1);
     }
     status_t ret = writeAligned(len);
@@ -657,6 +665,9 @@ status_t Parcel::writeInt32Array(size_t len, const int32_t *val) {
 }
 status_t Parcel::writeByteArray(size_t len, const uint8_t *val) {
     if (!val) {
+#ifdef _MTK_ENG_BUILD_
+		ALOGD("%p writeIntByteArray: val=NULL, write -1 to parcel\n", this);
+#endif
         return writeAligned(-1);
     }
     status_t ret = writeAligned(len);
@@ -716,6 +727,11 @@ status_t Parcel::writeString8(const String8& str)
     if (str.bytes() > 0 && err == NO_ERROR) {
         err = write(str.string(), str.bytes()+1);
     }
+#ifdef _MTK_ENG_BUILD_
+	else {
+		ALOGD("%p writeString8 fail str.bytes=%d err=%d\n", this, str.bytes(), (int32_t)err);
+	}
+#endif
     return err;
 }
 
@@ -726,8 +742,12 @@ status_t Parcel::writeString16(const String16& str)
 
 status_t Parcel::writeString16(const char16_t* str, size_t len)
 {
-    if (str == NULL) return writeInt32(-1);
-
+    if (str == NULL) {
+//#ifdef _MTK_ENG_BUILD_
+//		ALOGD("%p writeString16: str=NULL, write -1 to parcel\n", this);
+//#endif
+		return writeInt32(-1);
+	}
     status_t err = writeInt32(len);
     if (err == NO_ERROR) {
         len *= sizeof(char16_t);
@@ -1292,7 +1312,11 @@ status_t Parcel::readBlob(size_t len, ReadableBlob* outBlob) const
     if (fd == int(BAD_TYPE)) return BAD_VALUE;
 
     void* ptr = ::mmap(NULL, len, PROT_READ, MAP_SHARED, fd, 0);
-    if (ptr == MAP_FAILED) return NO_MEMORY;
+    if (ptr == MAP_FAILED)
+    {
+	    ALOGE("readBlob: read from ashmem but fail to mmap fd %d errno %d\n", fd, errno);
+	    return NO_MEMORY;
+    }
 
     outBlob->init(true /*mapped*/, ptr, len);
     return NO_ERROR;

@@ -251,6 +251,9 @@ private:
     static const char* dbgSourceStr(Source s);
 
     bool mMustRecompose;
+#ifdef MTK_AOSP_ENHANCEMENT
+    bool mWifiDisplay;
+#endif
 };
 
 // ---------------------------------------------------------------------------

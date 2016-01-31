@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2005 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -163,7 +168,8 @@ status_t BpBinder::transact(
     if (mAlive) {
         status_t status = IPCThreadState::self()->transact(
             mHandle, code, data, reply, flags);
-        if (status == DEAD_OBJECT) mAlive = 0;
+        // give serviceManager more chances...
+        if (status == DEAD_OBJECT && mHandle != 0) mAlive = 0;
         return status;
     }
 
