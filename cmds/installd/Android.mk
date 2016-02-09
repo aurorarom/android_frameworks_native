@@ -1,7 +1,6 @@
 LOCAL_PATH := $(call my-dir)
 
 common_src_files := commands.c utils.c
-common_cflags := -Wall -Werror
 
 #
 # Static library used in testing and executable

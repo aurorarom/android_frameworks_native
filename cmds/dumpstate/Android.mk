@@ -16,6 +16,6 @@ LOCAL_MODULE := dumpstate
 
 LOCAL_SHARED_LIBRARIES := libcutils liblog libselinux
 LOCAL_HAL_STATIC_LIBRARIES := libdumpstate
-LOCAL_CFLAGS += -Wall -Wno-unused-parameter -std=gnu99
+LOCAL_CFLAGS += -Wno-unused-parameter -std=gnu99
 
 include $(BUILD_EXECUTABLE)
