@@ -47,7 +47,7 @@ TextOutput& operator<<(TextOutput& to, bool val)
 TextOutput& operator<<(TextOutput& to, int val)
 {
     char buf[16];
-    snprintf(buf, sizeof(buf), "%d", val);
+    sprintf(buf, "%d", val);
     to.print(buf, strlen(buf));
     return to;
 }
@@ -55,7 +55,7 @@ TextOutput& operator<<(TextOutput& to, int val)
 TextOutput& operator<<(TextOutput& to, long val)
 {
     char buf[16];
-    snprintf(buf, sizeof(buf), "%ld", val);
+    sprintf(buf, "%ld", val);
     to.print(buf, strlen(buf));
     return to;
 }
@@ -63,7 +63,7 @@ TextOutput& operator<<(TextOutput& to, long val)
 TextOutput& operator<<(TextOutput& to, unsigned int val)
 {
     char buf[16];
-    snprintf(buf, sizeof(buf), "%u", val);
+    sprintf(buf, "%u", val);
     to.print(buf, strlen(buf));
     return to;
 }
@@ -71,7 +71,7 @@ TextOutput& operator<<(TextOutput& to, unsigned int val)
 TextOutput& operator<<(TextOutput& to, unsigned long val)
 {
     char buf[16];
-    snprintf(buf, sizeof(buf), "%lu", val);
+    sprintf(buf, "%lu", val);
     to.print(buf, strlen(buf));
     return to;
 }
@@ -79,7 +79,7 @@ TextOutput& operator<<(TextOutput& to, unsigned long val)
 TextOutput& operator<<(TextOutput& to, long long val)
 {
     char buf[32];
-    snprintf(buf, sizeof(buf), "%Ld", val);
+    sprintf(buf, "%Ld", val);
     to.print(buf, strlen(buf));
     return to;
 }
@@ -87,7 +87,7 @@ TextOutput& operator<<(TextOutput& to, long long val)
 TextOutput& operator<<(TextOutput& to, unsigned long long val)
 {
     char buf[32];
-    snprintf(buf, sizeof(buf), "%Lu", val);
+    sprintf(buf, "%Lu", val);
     to.print(buf, strlen(buf));
     return to;
 }
@@ -95,7 +95,7 @@ TextOutput& operator<<(TextOutput& to, unsigned long long val)
 static TextOutput& print_float(TextOutput& to, double value)
 {
     char buf[64];
-    snprintf(buf, sizeof(buf), "%g", value);
+    sprintf(buf, "%g", value);
     if( !strchr(buf, '.') && !strchr(buf, 'e') &&
         !strchr(buf, 'E') ) {
         strncat(buf, ".0", sizeof(buf)-1);

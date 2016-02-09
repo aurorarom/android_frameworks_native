@@ -96,7 +96,7 @@ static void __for_each_pid(void (*helper)(int, const char *, void *), const char
             continue;
         }
 
-        snprintf(cmdpath, sizeof(cmdpath),"/proc/%d/cmdline", pid);
+        sprintf(cmdpath,"/proc/%d/cmdline", pid);
         memset(cmdline, 0, sizeof(cmdline));
         if ((fd = open(cmdpath, O_RDONLY)) < 0) {
             strcpy(cmdline, "N/A");
@@ -125,7 +125,7 @@ static void for_each_tid_helper(int pid, const char *cmdline, void *arg) {
     char taskpath[255];
     for_each_tid_func *func = arg;
 
-    snprintf(taskpath, sizeof(taskpath), "/proc/%d/task", pid);
+    sprintf(taskpath, "/proc/%d/task", pid);
 
     if (!(d = opendir(taskpath))) {
         printf("Failed to open %s (%s)\n", taskpath, strerror(errno));
@@ -147,7 +147,7 @@ static void for_each_tid_helper(int pid, const char *cmdline, void *arg) {
         if (tid == pid)
             continue;
 
-        snprintf(commpath, sizeof(commpath),"/proc/%d/comm", tid);
+        sprintf(commpath,"/proc/%d/comm", tid);
         memset(comm, 0, sizeof(comm));
         if ((fd = open(commpath, O_RDONLY)) < 0) {
             strcpy(comm, "N/A");
@@ -179,7 +179,7 @@ void show_wchan(int pid, int tid, const char *name) {
 
     memset(buffer, 0, sizeof(buffer));
 
-    snprintf(path, sizeof(path), "/proc/%d/wchan", tid);
+    sprintf(path, "/proc/%d/wchan", tid);
     if ((fd = open(path, O_RDONLY)) < 0) {
         printf("Failed to open '%s' (%s)\n", path, strerror(errno));
         return;
@@ -204,12 +204,12 @@ void do_dump_settings(int userid) {
     char title[255];
     char dbpath[255];
     char sql[255];
-    snprintf(title, sizeof(title), "SYSTEM SETTINGS (user %d)", userid);
+    sprintf(title, "SYSTEM SETTINGS (user %d)", userid);
     if (userid == 0) {
         strcpy(dbpath, "/data/data/com.android.providers.settings/databases/settings.db");
         strcpy(sql, "pragma user_version; select * from system; select * from secure; select * from global;");
     } else {
-        snprintf(dbpath, sizeof(dbpath), "/data/system/users/%d/settings.db", userid);
+        sprintf(dbpath, "/data/system/users/%d/settings.db", userid);
         strcpy(sql, "pragma user_version; select * from system; select * from secure;");
     }
     run_command(title, 20, SU_PATH, "root", "sqlite3", dbpath, sql, NULL);
@@ -246,8 +246,8 @@ void do_showmap(int pid, const char *name) {
     char title[255];
     char arg[255];
 
-    snprintf(title, sizeof(title), "SHOW MAP %d (%s)", pid, name);
-    snprintf(arg, sizeof(arg), "%d", pid);
+    sprintf(title, "SHOW MAP %d (%s)", pid, name);
+    sprintf(arg, "%d", pid);
 
     if (skip) {
         /* Skip due to non-zero exit status on first run. */
